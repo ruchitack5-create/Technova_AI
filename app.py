@@ -1,9 +1,13 @@
+
 import streamlit as st
 import json
 import re
 from google import genai
 
-# PAGE SETTINGS
+# ==========================================
+# PAGE CONFIGURATION
+# ==========================================
+
 st.set_page_config(
     page_title="TECHNOVA AI",
     page_icon="🚀",
@@ -14,49 +18,57 @@ st.title("🚀 TECHNOVA AI")
 st.subheader("Your Personal AI Learning Companion")
 
 st.write(
-    "Learn smarter. Prepare better. Achieve more."
+    "Learn smarter. Practice better. Achieve more."
 )
 
-# GEMINI CONNECTION
+
+# ==========================================
+# GEMINI API CONNECTION
+# ==========================================
+
 try:
     client = genai.Client(
         api_key=st.secrets["GEMINI_API_KEY"]
     )
 except Exception:
-    st.error("API key not found. Please check Streamlit Secrets.")
+    st.error(
+        "API key not found. Please check Streamlit Secrets."
+    )
     st.stop()
 
 MODEL = "gemini-3.8-flash"
 
 
-# AI FUNCTION
 def ask_ai(prompt):
     response = client.models.generate_content(
         model=MODEL,
-        contents=prompt
+        contents=prompt,
+        config={
+            "max_output_tokens": 8192
+        }
     )
+
+    if not response.text:
+        raise ValueError("AI returned an empty response.")
+
     return response.text
 
 
-# COMMON STUDY SETTINGS
-st.sidebar.header("🎓 Learning Profile")
+# ==========================================
+# COURSE DATABASE
+# ==========================================
 
-level = st.sidebar.selectbox(
-    "Choose your category",
-    [
-        "School",
-        "College",
-        "Competitive Exams"
-    ]
-)
+school_courses = [
+    "Class 6",
+    "Class 7",
+    "Class 8",
+    "Class 9",
+    "Class 10",
+    "Class 11",
+    "Class 12"
+]
 
-exam_options = {
-    "School": [
-        "Class 6", "Class 7", "Class 8",
-        "Class 9", "Class 10", "Class 11",
-        "Class 12"
-    ],
-    "College": [
+college_courses = [
     "BE / BTech",
     "BSc",
     "MSc",
@@ -66,6 +78,7 @@ exam_options = {
     "MBBS",
     "BAMS",
     "BHMS",
+    "BUMS",
     "BBA",
     "MBA",
     "BCA",
@@ -76,6 +89,7 @@ exam_options = {
     "MA",
     "BPharm",
     "MPharm",
+    "DPharm",
     "BPT",
     "MPT",
     "LLB",
@@ -86,21 +100,67 @@ exam_options = {
     "Diploma - Mechanical",
     "Diploma - Civil",
     "Diploma - Computer Science",
-    "Diploma - Electronics"
-],
-    ],
-    "Competitive Exams": [
-        "NEET", "JEE Main", "JEE Advanced",
-        "KCET", "CUET", "UPSC",
-        "SSC", "IBPS Banking", "SBI Banking",
-        "NDA", "CDS"
-    ]
-}
+    "Diploma - Electronics",
+    "Diploma - Automobile",
+    "Diploma - Chemical",
+    "Diploma - Architecture"
+]
 
-course = st.sidebar.selectbox(
-    "Choose course or exam",
-    exam_options[level]
+competitive_exams = [
+    "NEET UG",
+    "JEE Main",
+    "JEE Advanced",
+    "KCET",
+    "COMEDK",
+    "CUET",
+    "UPSC",
+    "SSC",
+    "IBPS Banking",
+    "SBI Banking",
+    "NDA",
+    "CDS",
+    "CAT",
+    "GATE",
+    "CLAT",
+    "Other Competitive Exam"
+]
+
+
+# ==========================================
+# SIDEBAR - LEARNING PROFILE
+# ==========================================
+
+st.sidebar.title("🎓 Learning Profile")
+
+category = st.sidebar.selectbox(
+    "Choose your category",
+    [
+        "School",
+        "College",
+        "Competitive Exams"
+    ]
 )
+
+if category == "School":
+
+    course = st.sidebar.selectbox(
+        "Choose your class",
+        school_courses
+    )
+
+elif category == "College":
+
+    course = st.sidebar.selectbox(
+        "Choose your course",
+        college_courses
+    )
+
+else:
+
+    course = st.sidebar.selectbox(
+        "Choose your exam",
+        competitive_exams
+    )
 
 subject = st.sidebar.text_input(
     "Subject",
@@ -108,16 +168,28 @@ subject = st.sidebar.text_input(
 )
 
 topic = st.sidebar.text_input(
-    "Topic",
+    "Topic / Concept",
     placeholder="Example: Laws of Motion"
 )
 
+language = st.sidebar.selectbox(
+    "Output Language",
+    [
+        "English",
+        "Kannada",
+        "Hindi"
+    ]
+)
+
 st.sidebar.caption(
-    "Choose your course and enter a specific topic."
+    "Select your course and enter a topic to begin."
 )
 
 
+# ==========================================
 # MAIN TABS
+# ==========================================
+
 notes_tab, questions_tab, quiz_tab, about_tab = st.tabs(
     [
         "📚 Study Notes",
@@ -128,83 +200,113 @@ notes_tab, questions_tab, quiz_tab, about_tab = st.tabs(
 )
 
 
-# TAB 1: DETAILED NOTES
+# ==========================================
+# TAB 1 - DETAILED STUDY NOTES
+# ==========================================
+
 with notes_tab:
 
     st.header("📚 Detailed Study Notes")
 
     depth = st.selectbox(
-        "Choose explanation depth",
-        ["Basic", "Detailed", "In-depth"]
+        "Choose Explanation Depth",
+        [
+            "Basic",
+            "Detailed",
+            "In-depth"
+        ]
     )
 
-    language = st.selectbox(
-        "Choose language",
-        ["English", "Kannada", "Hindi"]
+    include_examples = st.checkbox(
+        "Include examples",
+        value=True
+    )
+
+    include_exam_points = st.checkbox(
+        "Include important exam points",
+        value=True
     )
 
     if st.button("Generate Study Notes"):
 
         if not subject.strip() or not topic.strip():
-            st.warning("Please enter both subject and topic.")
+
+            st.warning(
+                "Please enter subject and topic in the sidebar."
+            )
 
         else:
+
             prompt = f"""
 You are an expert teacher and educational content creator.
 
-Create high-quality educational notes.
+Create comprehensive educational notes.
 
-Education category: {level}
-Course or exam: {course}
+Category: {category}
+Course or Exam: {course}
 Subject: {subject}
 Topic: {topic}
-Explanation depth: {depth}
+Explanation Depth: {depth}
 Language: {language}
 
-Instructions:
+Follow these instructions:
 
-1. Start with a clear introduction.
-2. Explain every important concept step by step.
-3. Include definitions and key terminology.
-4. Explain the topic in sufficient depth.
-5. Include relevant examples.
+1. Give a clear introduction.
+2. Explain the topic step by step.
+3. Include important definitions.
+4. Explain concepts in sufficient depth.
+5. Include relevant subtopics.
 6. Include formulas and derivations wherever applicable.
 7. Explain practical applications.
-8. Include important points for examinations.
-9. Add common mistakes and misconceptions.
-10. Finish with a detailed summary.
+8. Include examples: {include_examples}.
+9. Include important examination points: {include_exam_points}.
+10. Explain common mistakes and misconceptions.
+11. Finish with a detailed summary.
+12. Include important keywords.
 
-For science subjects, explain scientific concepts accurately.
-For engineering subjects, include technical details.
-For NEET and JEE, focus on relevant exam concepts.
+For engineering, include technical explanations.
+For nursing and medical courses, use accurate
+educational terminology.
+For NEET and JEE, focus on relevant examination concepts.
+For school students, use age-appropriate explanations.
 
 Do not give unnecessarily short answers.
 Do not invent facts or formulas.
 Use clear headings and subheadings.
+Mention when syllabus-specific information needs verification.
 """
 
-            with st.spinner("Preparing detailed notes..."):
+            with st.spinner("Creating detailed notes..."):
+
                 try:
+
                     result = ask_ai(prompt)
+
                     st.markdown(result)
 
                     st.download_button(
                         "⬇️ Download Notes",
-                        result,
-                        file_name="TECHNOVA_Notes.txt"
+                        data=result,
+                        file_name="TECHNOVA_Study_Notes.txt"
                     )
 
                 except Exception as e:
-                    st.error(f"Generation failed: {e}")
+
+                    st.error(
+                        f"Notes generation failed: {e}"
+                    )
 
 
-# TAB 2: QUESTION BANK
+# ==========================================
+# TAB 2 - QUESTION BANK
+# ==========================================
+
 with questions_tab:
 
     st.header("📝 Important Question Bank")
 
     marks = st.multiselect(
-        "Select question marks",
+        "Select Question Marks",
         [2, 5, 10],
         default=[2, 5, 10]
     )
@@ -212,113 +314,149 @@ with questions_tab:
     if st.button("Generate Question Bank"):
 
         if not subject.strip() or not topic.strip():
-            st.warning("Enter subject and topic first.")
+
+            st.warning(
+                "Please enter subject and topic in the sidebar."
+            )
 
         elif not marks:
-            st.warning("Select at least one mark category.")
+
+            st.warning(
+                "Please select at least one mark category."
+            )
 
         else:
-            prompt = f"""
-Act as an experienced examination question paper setter.
 
-Course: {course}
-Category: {level}
+            prompt = f"""
+Act as an experienced examination question setter.
+
+Category: {category}
+Course or Exam: {course}
 Subject: {subject}
 Topic: {topic}
+Language: {language}
 
-Generate important examination questions for:
+Generate important questions for:
 {marks} marks.
 
-For every question:
-- Write the question clearly.
-- Give a correct and sufficiently detailed answer.
-- Use examples wherever needed.
-- Organise answers according to marks.
-- Include important keywords.
-- Avoid repeating questions.
+For 2-mark questions:
+Give concise and complete answers.
 
-For 2 marks: concise but complete answers.
-For 5 marks: structured explanations.
-For 10 marks: detailed answers with headings,
-examples, diagrams described in text where relevant.
+For 5-mark questions:
+Give structured explanations with examples.
 
-Use {language if 'language' in globals() else 'English'}.
+For 10-mark questions:
+Give detailed answers with headings,
+subheadings, examples and diagrams described in text.
+
+Include:
+1. Important examination questions.
+2. Correct and sufficiently detailed answers.
+3. Relevant examples.
+4. Important keywords.
+5. Numerical problems wherever appropriate.
+
+Avoid repeated questions.
+Match the course or examination level.
+Do not invent syllabus-specific information.
 """
 
-            with st.spinner("Creating question bank..."):
+            with st.spinner("Preparing question bank..."):
+
                 try:
+
                     result = ask_ai(prompt)
+
                     st.markdown(result)
 
                     st.download_button(
-                        "⬇️ Download Questions",
-                        result,
+                        "⬇️ Download Question Bank",
+                        data=result,
                         file_name="TECHNOVA_Question_Bank.txt"
                     )
 
                 except Exception as e:
-                    st.error(f"Generation failed: {e}")
+
+                    st.error(
+                        f"Question generation failed: {e}"
+                    )
 
 
-# TAB 3: QUIZ
+# ==========================================
+# TAB 3 - INTERACTIVE QUIZ
+# ==========================================
+
 with quiz_tab:
 
     st.header("🧠 Test Your Knowledge")
 
     number = st.selectbox(
-        "Number of questions",
+        "Number of Questions",
         [5, 10, 15]
     )
 
     difficulty = st.selectbox(
-        "Difficulty",
-        ["Easy", "Medium", "Hard"]
+        "Difficulty Level",
+        [
+            "Easy",
+            "Medium",
+            "Hard"
+        ]
     )
 
     if st.button("Generate Quiz"):
 
         if not subject.strip() or not topic.strip():
-            st.warning("Enter subject and topic first.")
+
+            st.warning(
+                "Please enter subject and topic in the sidebar."
+            )
 
         else:
-            prompt = f"""
-Create {number} multiple-choice questions.
 
-Course: {course}
+            prompt = f"""
+Create exactly {number} multiple-choice questions.
+
+Category: {category}
+Course or Exam: {course}
 Subject: {subject}
 Topic: {topic}
 Difficulty: {difficulty}
+Language: {language}
 
 Return ONLY valid JSON in this format:
 
 {{
-  "questions": [
-    {{
-      "question": "Question text",
-      "options": [
-        "Option A",
-        "Option B",
-        "Option C",
-        "Option D"
-      ],
-      "answer": "Option A",
-      "explanation": "Detailed explanation"
-    }}
-  ]
+    "questions": [
+        {{
+            "question": "Question text",
+            "options": [
+                "Option A",
+                "Option B",
+                "Option C",
+                "Option D"
+            ],
+            "answer": "Exact correct option text",
+            "explanation": "Detailed explanation"
+        }}
+    ]
 }}
 
 Rules:
 - Exactly {number} questions.
-- Four options per question.
-- One correct answer.
-- Correct answers must match one option exactly.
-- Include explanations.
-- No markdown or extra text outside JSON.
-- Ensure scientific and factual accuracy.
+- Exactly four options per question.
+- Only one correct answer.
+- Answer must match one option exactly.
+- Give useful explanations.
+- Avoid repeated questions.
+- Ensure factual accuracy.
+- No markdown outside JSON.
 """
 
-            with st.spinner("Preparing your quiz..."):
+            with st.spinner("Creating your quiz..."):
+
                 try:
+
                     result = ask_ai(prompt)
 
                     match = re.search(
@@ -328,104 +466,217 @@ Rules:
                     )
 
                     if not match:
-                        raise ValueError("Quiz format was invalid.")
+
+                        raise ValueError(
+                            "AI returned an invalid quiz format."
+                        )
 
                     quiz_data = json.loads(match.group())
 
-                    if len(quiz_data["questions"]) != number:
-                        raise ValueError("Incorrect number of questions.")
+                    quiz_questions = quiz_data["questions"]
 
-                    st.session_state.quiz_data = quiz_data
+                    if len(quiz_questions) != number:
+
+                        raise ValueError(
+                            "Incorrect number of questions."
+                        )
+
+                    for q in quiz_questions:
+
+                        if (
+                            len(q["options"]) != 4
+                            or q["answer"] not in q["options"]
+                            or not q.get("explanation")
+                        ):
+
+                            raise ValueError(
+                                "One or more quiz questions are invalid."
+                            )
+
+                    st.session_state.quiz_data = quiz_questions
+
                     st.session_state.quiz_submitted = False
 
+                    st.session_state.quiz_version = (
+                        st.session_state.get("quiz_version", 0) + 1
+                    )
+
+                    st.session_state.quiz_answers = {}
+
+                    st.rerun()
+
                 except Exception as e:
-                    st.error(f"Quiz generation failed: {e}")
+
+                    st.error(
+                        f"Quiz generation failed: {e}"
+                    )
+
 
     if "quiz_data" in st.session_state:
 
-        quiz = st.session_state.quiz_data
-        answers = []
-
-        for i, q in enumerate(quiz["questions"]):
-
-            st.markdown(
-                f"**Q{i+1}. {q['question']}**"
-            )
-
-            answer = st.radio(
-                "Choose your answer:",
-                q["options"],
-                key=f"question_{i}"
-            )
-
-            answers.append(answer)
+        quiz_questions = st.session_state.quiz_data
 
         if not st.session_state.quiz_submitted:
 
-            if st.button("Submit Quiz"):
+            with st.form("quiz_form"):
 
-                score = 0
+                answers = {}
 
-                for i, q in enumerate(quiz["questions"]):
-                    if answers[i] == q["answer"]:
-                        score += 1
+                for i, q in enumerate(quiz_questions):
 
-                st.session_state.quiz_score = score
-                st.session_state.quiz_answers = answers
-                st.session_state.quiz_submitted = True
-                st.rerun()
+                    st.markdown(
+                        f"**Q{i + 1}. {q['question']}**"
+                    )
+
+                    answers[i] = st.radio(
+                        "Choose your answer:",
+                        q["options"],
+                        index=None,
+                        key=(
+                            f"quiz_{st.session_state.quiz_version}_{i}"
+                        )
+                    )
+
+                submitted = st.form_submit_button(
+                    "Submit Quiz"
+                )
+
+                if submitted:
+
+                    if any(
+                        answer is None
+                        for answer in answers.values()
+                    ):
+
+                        st.warning(
+                            "Please answer every question."
+                        )
+
+                    else:
+
+                        score = sum(
+                            1
+                            for i, q in enumerate(quiz_questions)
+                            if answers[i] == q["answer"]
+                        )
+
+                        st.session_state.quiz_answers = answers
+
+                        st.session_state.quiz_score = score
+
+                        st.session_state.quiz_submitted = True
+
+                        st.rerun()
 
         else:
 
+            score = st.session_state.quiz_score
+
+            total = len(quiz_questions)
+
+            percentage = (score / total) * 100
+
             st.success(
-                f"Your score: "
-                f"{st.session_state.quiz_score}/{len(quiz['questions'])}"
+                f"Your Score: {score}/{total}"
             )
 
-            for i, q in enumerate(quiz["questions"]):
+            st.write(
+                f"Your Percentage: {percentage:.1f}%"
+            )
 
-                st.write(f"**Question {i+1}:** {q['question']}")
+            for i, q in enumerate(quiz_questions):
 
-                if st.session_state.quiz_answers[i] == q["answer"]:
-                    st.success("Correct answer!")
+                st.markdown(
+                    f"**Q{i + 1}. {q['question']}**"
+                )
 
-                else:
-                    st.error(
-                        f"Your answer: "
-                        f"{st.session_state.quiz_answers[i]}"
+                user_answer = (
+                    st.session_state.quiz_answers[i]
+                )
+
+                if user_answer == q["answer"]:
+
+                    st.success(
+                        f"Your answer: {user_answer}"
                     )
 
-                st.info(
-                    f"Correct answer: {q['answer']}\n\n"
+                else:
+
+                    st.error(
+                        f"Your answer: {user_answer}"
+                    )
+
+                    st.info(
+                        f"Correct answer: {q['answer']}"
+                    )
+
+                st.write(
                     f"Explanation: {q['explanation']}"
                 )
 
             if st.button("Try Another Quiz"):
+
                 del st.session_state.quiz_data
+
                 st.session_state.quiz_submitted = False
+
+                st.session_state.quiz_answers = {}
+
                 st.rerun()
 
 
-# TAB 4: ABOUT
+# ==========================================
+# TAB 4 - ABOUT TECHNOVA AI
+# ==========================================
+
 with about_tab:
 
     st.header("About TECHNOVA AI")
 
     st.write("""
-    TECHNOVA AI is an AI-powered learning platform
-    designed for students.
+    TECHNOVA AI is an AI-powered educational platform
+    designed for school students, college students
+    and competitive examination aspirants.
 
-    Our mission is to make learning easier and
-    examination preparation smarter.
+    Our features:
 
-    Features:
-    - Detailed study notes
-    - Important question banks
-    - Interactive MCQ quizzes
-    - School and college learning
-    - Competitive examination preparation
+    📚 Detailed topic-wise study notes
+
+    📝 Important question banks
+
+    🧠 Interactive MCQ quizzes
+
+    🎓 Multiple educational courses
+
+    🎯 Competitive examination preparation
+
+    Our mission is to make learning easier,
+    smarter and more accessible.
 
     Learn. Practice. Improve. Succeed.
     """)
 
-    st.caption("TECHNOVA AI | Built with ❤️")
+
+# ==========================================
+# FOOTER - CREATOR SIGNATURE
+# ==========================================
+
+st.markdown("---")
+
+st.markdown(
+    """
+    <h3 style="text-align:center;">
+        TECHNOVA AI 🚀
+    </h3>
+    """,
+    unsafe_allow_html=True
+)
+
+st.markdown(
+    """
+    <p style="text-align:center; font-size:16px;">
+        Built with ❤️ by <b>Ruchita</b>
+    </p>
+    """,
+    unsafe_allow_html=True
+)
