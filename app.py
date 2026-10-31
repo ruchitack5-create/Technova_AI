@@ -36,7 +36,7 @@ except Exception:
     )
     st.stop()
 
-MODEL = "gemini-3.8-flash"
+MODEL = "gemini-3.8-flash-lite"
 
 
 def ask_ai(prompt):
@@ -44,7 +44,7 @@ def ask_ai(prompt):
         model=MODEL,
         contents=prompt,
         config={
-            "max_output_tokens": 8192
+            "max_output_tokens": 4096
         }
     )
 
