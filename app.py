@@ -1,263 +1,402 @@
-import streamlit as st
-import time
+ import streamlit as st
 import json
+import re
 from google import genai
 
+# PAGE SETTINGS
 st.set_page_config(
     page_title="TECHNOVA AI",
-    page_icon="📚",
-    layout="centered"
+    page_icon="🚀",
+    layout="wide"
 )
 
 st.title("🚀 TECHNOVA AI")
-st.subheader("Your Personal AI Study Companion")
+st.subheader("Your Personal AI Learning Companion")
 
+st.write(
+    "Learn smarter. Prepare better. Achieve more."
+)
+
+# GEMINI CONNECTION
 try:
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
+    client = genai.Client(
+        api_key=st.secrets["GEMINI_API_KEY"]
+    )
 except Exception:
-    st.error("API key missing. Check Streamlit Secrets.")
+    st.error("API key not found. Please check Streamlit Secrets.")
     st.stop()
 
+MODEL = "gemini-3.8-flash"
 
+
+# AI FUNCTION
 def ask_ai(prompt):
-    for attempt in range(3):
-        try:
-            response = client.models.generate_content(
-                model="gemini-3.5-flash-lite",
-                contents=prompt
-            )
-            return response.text
-        except Exception:
-            if attempt < 2:
-                time.sleep(2 ** (attempt + 1))
-            else:
-                raise
+    response = client.models.generate_content(
+        model=MODEL,
+        contents=prompt
+    )
+    return response.text
 
 
-notes_tab, question_tab, quiz_tab = st.tabs(
-    ["📚 Notes", "📝 Question Bank", "🧠 Quiz"]
+# COMMON STUDY SETTINGS
+st.sidebar.header("🎓 Learning Profile")
+
+level = st.sidebar.selectbox(
+    "Choose your category",
+    [
+        "School",
+        "College",
+        "Competitive Exams"
+    ]
+)
+
+exam_options = {
+    "School": [
+        "Class 6", "Class 7", "Class 8",
+        "Class 9", "Class 10", "Class 11",
+        "Class 12"
+    ],
+    "College": [
+        "BE / BTech", "BSc", "BCA",
+        "BCom", "BA", "Diploma"
+    ],
+    "Competitive Exams": [
+        "NEET", "JEE Main", "JEE Advanced",
+        "KCET", "CUET", "UPSC",
+        "SSC", "IBPS Banking", "SBI Banking",
+        "NDA", "CDS"
+    ]
+}
+
+course = st.sidebar.selectbox(
+    "Choose course or exam",
+    exam_options[level]
+)
+
+subject = st.sidebar.text_input(
+    "Subject",
+    placeholder="Example: Physics"
+)
+
+topic = st.sidebar.text_input(
+    "Topic",
+    placeholder="Example: Laws of Motion"
+)
+
+st.sidebar.caption(
+    "Choose your course and enter a specific topic."
 )
 
 
-# NOTES GENERATOR
+# MAIN TABS
+notes_tab, questions_tab, quiz_tab, about_tab = st.tabs(
+    [
+        "📚 Study Notes",
+        "📝 Question Bank",
+        "🧠 Quiz",
+        "ℹ️ About"
+    ]
+)
+
+
+# TAB 1: DETAILED NOTES
 with notes_tab:
-    st.header("📚 AI Notes Generator")
 
-    topic = st.text_input("Enter your topic", key="notes_topic")
+    st.header("📚 Detailed Study Notes")
 
-    level = st.selectbox(
-        "Study level",
-        ["School", "Diploma", "Engineering", "Degree"],
-        key="notes_level"
-    )
-
-    length = st.selectbox(
-        "Notes length",
-        ["Short", "Medium", "Detailed"],
-        key="notes_length"
+    depth = st.selectbox(
+        "Choose explanation depth",
+        ["Basic", "Detailed", "In-depth"]
     )
 
     language = st.selectbox(
-        "Language",
-        ["Simple English", "Kannada", "Hindi"],
-        key="notes_language"
+        "Choose language",
+        ["English", "Kannada", "Hindi"]
     )
 
-    if st.button("✨ Generate Notes"):
-        if not topic.strip():
-            st.warning("Enter a topic first.")
+    if st.button("Generate Study Notes"):
+
+        if not subject.strip() or not topic.strip():
+            st.warning("Please enter both subject and topic.")
+
         else:
-            try:
-                prompt = f"""
-Create accurate examination notes about {topic}.
-Student level: {level}
-Length: {length}
+            prompt = f"""
+You are an expert teacher and educational content creator.
+
+Create high-quality educational notes.
+
+Education category: {level}
+Course or exam: {course}
+Subject: {subject}
+Topic: {topic}
+Explanation depth: {depth}
 Language: {language}
 
-Include:
-1. Introduction
-2. Definitions
-3. Main concepts
-4. Examples
-5. Applications
-6. Important exam points
-7. Conclusion
+Instructions:
 
-Use clear headings and simple language.
+1. Start with a clear introduction.
+2. Explain every important concept step by step.
+3. Include definitions and key terminology.
+4. Explain the topic in sufficient depth.
+5. Include relevant examples.
+6. Include formulas and derivations wherever applicable.
+7. Explain practical applications.
+8. Include important points for examinations.
+9. Add common mistakes and misconceptions.
+10. Finish with a detailed summary.
+
+For science subjects, explain scientific concepts accurately.
+For engineering subjects, include technical details.
+For NEET and JEE, focus on relevant exam concepts.
+
+Do not give unnecessarily short answers.
+Do not invent facts or formulas.
+Use clear headings and subheadings.
 """
-                with st.spinner("Creating your notes..."):
+
+            with st.spinner("Preparing detailed notes..."):
+                try:
                     result = ask_ai(prompt)
+                    st.markdown(result)
 
-                st.success("Notes generated!")
-                st.markdown(result)
+                    st.download_button(
+                        "⬇️ Download Notes",
+                        result,
+                        file_name="TECHNOVA_Notes.txt"
+                    )
 
-                st.download_button(
-                    "⬇️ Download Notes",
-                    result,
-                    file_name="TECHNOVA_Notes.txt"
-                )
-
-            except Exception as e:
-                st.error(f"Error: {e}")
+                except Exception as e:
+                    st.error(f"Generation failed: {e}")
 
 
-# IMPORTANT QUESTION BANK
-with question_tab:
+# TAB 2: QUESTION BANK
+with questions_tab:
+
     st.header("📝 Important Question Bank")
-
-    subject = st.text_input("Enter subject or topic", key="question_topic")
 
     marks = st.multiselect(
         "Select question marks",
-        ["2 Marks", "5 Marks", "10 Marks"],
-        default=["2 Marks", "5 Marks", "10 Marks"]
+        [2, 5, 10],
+        default=[2, 5, 10]
     )
 
-    if st.button("✨ Generate Question Bank"):
-        if not subject.strip():
-            st.warning("Enter a subject or topic.")
+    if st.button("Generate Question Bank"):
+
+        if not subject.strip() or not topic.strip():
+            st.warning("Enter subject and topic first.")
+
         elif not marks:
-            st.warning("Select at least one question type.")
+            st.warning("Select at least one mark category.")
+
         else:
-            try:
-                prompt = f"""
-Act as an experienced engineering examination teacher.
+            prompt = f"""
+Act as an experienced examination question paper setter.
 
-Create an important question bank for:
+Course: {course}
+Category: {level}
 Subject: {subject}
+Topic: {topic}
 
-Include these question types: {marks}
+Generate important examination questions for:
+{marks} marks.
 
 For every question:
-- Give a clear question.
-- Provide a correct, detailed answer.
-- Use simple English.
-- Include examples wherever useful.
-- Organize answers with headings and points.
+- Write the question clearly.
+- Give a correct and sufficiently detailed answer.
+- Use examples wherever needed.
+- Organise answers according to marks.
+- Include important keywords.
+- Avoid repeating questions.
 
-Do not claim questions are guaranteed to appear in exams.
+For 2 marks: concise but complete answers.
+For 5 marks: structured explanations.
+For 10 marks: detailed answers with headings,
+examples, diagrams described in text where relevant.
+
+Use {language if 'language' in globals() else 'English'}.
 """
-                with st.spinner("Preparing your question bank..."):
+
+            with st.spinner("Creating question bank..."):
+                try:
                     result = ask_ai(prompt)
+                    st.markdown(result)
 
-                st.success("Question bank generated!")
-                st.markdown(result)
+                    st.download_button(
+                        "⬇️ Download Questions",
+                        result,
+                        file_name="TECHNOVA_Question_Bank.txt"
+                    )
 
-                st.download_button(
-                    "⬇️ Download Question Bank",
-                    result,
-                    file_name="TECHNOVA_Question_Bank.txt"
-                )
-
-            except Exception as e:
-                st.error(f"Error: {e}")
+                except Exception as e:
+                    st.error(f"Generation failed: {e}")
 
 
-# AI QUIZ
+# TAB 3: QUIZ
 with quiz_tab:
-    st.header("🧠 AI Practice Quiz")
 
-    quiz_topic = st.text_input("Enter quiz topic", key="quiz_topic")
+    st.header("🧠 Test Your Knowledge")
+
+    number = st.selectbox(
+        "Number of questions",
+        [5, 10, 15]
+    )
 
     difficulty = st.selectbox(
         "Difficulty",
         ["Easy", "Medium", "Hard"]
     )
 
-    if st.button("🎯 Generate Quiz"):
-        if not quiz_topic.strip():
-            st.warning("Enter a topic first.")
+    if st.button("Generate Quiz"):
+
+        if not subject.strip() or not topic.strip():
+            st.warning("Enter subject and topic first.")
+
         else:
-            try:
-                prompt = f"""
-Create exactly 5 multiple-choice questions about {quiz_topic}.
-Difficulty: {difficulty}.
+            prompt = f"""
+Create {number} multiple-choice questions.
+
+Course: {course}
+Subject: {subject}
+Topic: {topic}
+Difficulty: {difficulty}
 
 Return ONLY valid JSON in this format:
+
 {{
- "questions": [
-  {{
-   "question": "Question text",
-   "options": ["Option A", "Option B", "Option C", "Option D"],
-   "answer": 0,
-   "explanation": "Explanation"
-  }}
- ]
+  "questions": [
+    {{
+      "question": "Question text",
+      "options": [
+        "Option A",
+        "Option B",
+        "Option C",
+        "Option D"
+      ],
+      "answer": "Option A",
+      "explanation": "Detailed explanation"
+    }}
+  ]
 }}
 
-The answer must be the correct option's index:
-0, 1, 2 or 3.
+Rules:
+- Exactly {number} questions.
+- Four options per question.
+- One correct answer.
+- Correct answers must match one option exactly.
+- Include explanations.
+- No markdown or extra text outside JSON.
+- Ensure scientific and factual accuracy.
 """
-                with st.spinner("Creating your quiz..."):
+
+            with st.spinner("Preparing your quiz..."):
+                try:
                     result = ask_ai(prompt)
 
-                result = result.strip()
-                if result.startswith("```"):
-                    result = result.split("\n", 1)[1]
-                    result = result.rsplit("```", 1)[0]
+                    match = re.search(
+                        r"\{.*\}",
+                        result,
+                        re.DOTALL
+                    )
 
-                quiz_data = json.loads(result)
+                    if not match:
+                        raise ValueError("Quiz format was invalid.")
 
-                if len(quiz_data["questions"]) != 5:
-                    raise ValueError("Quiz did not contain 5 questions.")
+                    quiz_data = json.loads(match.group())
 
-                st.session_state.quiz = quiz_data["questions"]
-                st.session_state.quiz_submitted = False
+                    if len(quiz_data["questions"]) != number:
+                        raise ValueError("Incorrect number of questions.")
 
-            except Exception as e:
-                st.error(f"Could not create quiz: {e}")
+                    st.session_state.quiz_data = quiz_data
+                    st.session_state.quiz_submitted = False
 
-    if "quiz" in st.session_state:
-        questions = st.session_state.quiz
+                except Exception as e:
+                    st.error(f"Quiz generation failed: {e}")
 
-        if not st.session_state.quiz_submitted:
-            answers = []
+    if "quiz_data" in st.session_state:
 
-            for i, q in enumerate(questions):
-                st.markdown(f"**Q{i+1}. {q['question']}**")
+        quiz = st.session_state.quiz_data
+        answers = []
 
-                selected = st.radio(
-                    "Choose your answer:",
-                    q["options"],
-                    key=f"quiz_answer_{i}",
-                    index=None
-                )
-                answers.append(selected)
+        for i, q in enumerate(quiz["questions"]):
 
-            if st.button("Submit Quiz"):
-                if None in answers:
-                    st.warning("Please answer all questions.")
-                else:
-                    score = 0
-
-                    for i, q in enumerate(questions):
-                        if answers[i] == q["options"][q["answer"]]:
-                            score += 1
-
-                    st.session_state.quiz_answers = answers
-                    st.session_state.quiz_score = score
-                    st.session_state.quiz_submitted = True
-                    st.rerun()
-
-        else:
-            st.success(
-                f"Your score: {st.session_state.quiz_score}/5"
+            st.markdown(
+                f"**Q{i+1}. {q['question']}**"
             )
 
-            for i, q in enumerate(questions):
-                st.markdown(f"**Q{i+1}. {q['question']}**")
-                st.write(
-                    "Correct answer:",
-                    q["options"][q["answer"]]
+            answer = st.radio(
+                "Choose your answer:",
+                q["options"],
+                key=f"question_{i}"
+            )
+
+            answers.append(answer)
+
+        if not st.session_state.quiz_submitted:
+
+            if st.button("Submit Quiz"):
+
+                score = 0
+
+                for i, q in enumerate(quiz["questions"]):
+                    if answers[i] == q["answer"]:
+                        score += 1
+
+                st.session_state.quiz_score = score
+                st.session_state.quiz_answers = answers
+                st.session_state.quiz_submitted = True
+                st.rerun()
+
+        else:
+
+            st.success(
+                f"Your score: "
+                f"{st.session_state.quiz_score}/{len(quiz['questions'])}"
+            )
+
+            for i, q in enumerate(quiz["questions"]):
+
+                st.write(f"**Question {i+1}:** {q['question']}")
+
+                if st.session_state.quiz_answers[i] == q["answer"]:
+                    st.success("Correct answer!")
+
+                else:
+                    st.error(
+                        f"Your answer: "
+                        f"{st.session_state.quiz_answers[i]}"
+                    )
+
+                st.info(
+                    f"Correct answer: {q['answer']}\n\n"
+                    f"Explanation: {q['explanation']}"
                 )
-                st.write("Explanation:", q["explanation"])
 
             if st.button("Try Another Quiz"):
-                del st.session_state.quiz
+                del st.session_state.quiz_data
                 st.session_state.quiz_submitted = False
                 st.rerun()
 
 
-st.divider()
-st.markdown("### 🌟 Learn Beyond Limits")
-st.caption("TECHNOVA AI | Your Personal AI Study Companion")
+# TAB 4: ABOUT
+with about_tab:
+
+    st.header("About TECHNOVA AI")
+
+    st.write("""
+    TECHNOVA AI is an AI-powered learning platform
+    designed for students.
+
+    Our mission is to make learning easier and
+    examination preparation smarter.
+
+    Features:
+    - Detailed study notes
+    - Important question banks
+    - Interactive MCQ quizzes
+    - School and college learning
+    - Competitive examination preparation
+
+    Learn. Practice. Improve. Succeed.
+    """)
+
+    st.caption("TECHNOVA AI | Built with ❤️")
