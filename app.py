@@ -1,101 +1,86 @@
-
 import streamlit as st
+from google import genai
 
 st.set_page_config(
     page_title="TECHNOVA AI",
-    page_icon="🎓",
-    layout="wide"
+    page_icon="📚",
+    layout="centered"
 )
 
-# Custom design
-st.markdown("""
-<style>
-.stApp {
-    background-color: #101426;
-    color: white;
-}
-h1 {
-    color: #8B9CFF;
-    text-align: center;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Application title
-st.title("TECHNOVA AI")
-st.markdown("### Learn Beyond Limits")
-
+st.title("🚀 TECHNOVA AI")
+st.subheader("Welcome to your learning space")
 st.write("Your Personal AI Study Companion")
 
 st.divider()
 
-# Student details
-st.sidebar.title("TECHNOVA AI")
+st.header("📚 AI Notes Generator")
+st.write("Generate easy-to-understand study notes on any topic.")
 
-name = st.sidebar.text_input("Your Name")
-
-level = st.sidebar.selectbox(
-    "Education Level",
-    ["School", "PUC", "Diploma",
-     "Engineering", "Degree"]
+topic = st.text_input(
+    "Enter your topic",
+    placeholder="Example: Artificial Intelligence"
 )
 
-language = st.sidebar.selectbox(
-    "Preferred Language",
-    ["English", "Kannada", "Hindi",
-     "Tamil", "Telugu"]
+level = st.selectbox(
+    "Choose your study level",
+    ["School", "Diploma", "Engineering", "Degree"]
 )
 
-st.subheader("Welcome to your learning space!")
+length = st.selectbox(
+    "Choose notes length",
+    ["Short", "Medium", "Detailed"]
+)
 
-if name:
-    st.write(f"Hello, {name}! 👋")
+if st.button("✨ Generate Notes"):
 
-st.write("Choose what you want to do today.")
+    if not topic.strip():
+        st.warning("Please enter a topic first.")
 
-# Learning tools
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📚 Notes",
-    "🧠 Doubts",
-    "📝 Exams",
-    "🎯 Quiz"
-])
+    else:
+        try:
+            api_key = st.secrets["GEMINI_API_KEY"]
+            client = genai.Client(api_key=api_key)
 
-with tab1:
-    st.subheader("Smart Notes Generator")
-    topic = st.text_input("Enter your subject or topic")
+            prompt = f"""
+            Act as an expert teacher.
 
-    if st.button("Generate Notes"):
-        st.info("Our AI Notes Generator is coming soon!")
+            Create clear and accurate study notes about:
+            {topic}
 
-with tab2:
-    st.subheader("AI Doubt Solver")
-    question = st.text_area("Ask your academic question")
+            Student level: {level}
+            Notes length: {length}
 
-    if st.button("Solve My Doubt"):
-        st.info("Our AI Doubt Solver is coming soon!")
+            Include:
+            1. Introduction
+            2. Important definitions
+            3. Main concepts with explanations
+            4. Examples
+            5. Key points to remember
+            6. Short conclusion
 
-with tab3:
-    st.subheader("Exam Preparation")
+            Use simple English and clear headings.
+            """
 
-    marks = st.selectbox(
-        "Select answer marks",
-        [2, 5, 10, 15]
-    )
+            with st.spinner("Creating your notes..."):
 
-    exam_question = st.text_input("Enter your question")
+                response = client.models.generate_content(
+                    model="gemini-flash-latest",
+                    contents=prompt
+                )
 
-    if st.button("Prepare Answer"):
-        st.info("Our Exam Answer Generator is coming soon!")
+            st.success("Your notes are ready!")
 
-with tab4:
-    st.subheader("Quiz Generator")
+            st.markdown(response.text)
 
-    subject = st.text_input("Enter subject name")
+            st.download_button(
+                "⬇️ Download Notes",
+                data=response.text,
+                file_name="TECHNOVA_AI_Notes.txt",
+                mime="text/plain"
+            )
 
-    if st.button("Create Quiz"):
-        st.info("Our Quiz Generator is coming soon!")
+        except Exception as e:
+            st.error(f"Something went wrong: {e}")
 
 st.divider()
-
-st.caption("© 2026 TECHNOVA AI | Learn Beyond Limits")
+st.caption("TECHNOVA AI | Learn Beyond Limits")
