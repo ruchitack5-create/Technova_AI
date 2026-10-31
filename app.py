@@ -1,4 +1,3 @@
-
 import streamlit as st
 import json
 import re
@@ -16,11 +15,7 @@ st.set_page_config(
 
 st.title("🚀 TECHNOVA AI")
 st.subheader("Your Personal AI Learning Companion")
-
-st.write(
-    "Learn smarter. Practice better. Achieve more."
-)
-
+st.write("Learn smarter. Practice better. Achieve more.")
 
 # ==========================================
 # GEMINI API CONNECTION
@@ -31,9 +26,7 @@ try:
         api_key=st.secrets["GEMINI_API_KEY"]
     )
 except Exception:
-    st.error(
-        "API key not found. Please check Streamlit Secrets."
-    )
+    st.error("API key not found. Please check Streamlit Secrets.")
     st.stop()
 
 MODEL = "gemini-3.5-flash-lite"
@@ -43,9 +36,7 @@ def ask_ai(prompt):
     response = client.models.generate_content(
         model=MODEL,
         contents=prompt,
-        config={
-            "max_output_tokens": 4096
-        }
+        config={"max_output_tokens": 4096}
     )
 
     if not response.text:
@@ -54,48 +45,64 @@ def ask_ai(prompt):
     return response.text
 
 
+def extract_json(text):
+    """Extract JSON safely from an AI response."""
+    text = text.strip()
+
+    text = re.sub(
+        r"^```(?:json)?\s*",
+        "",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    text = re.sub(r"\s*```$", "", text)
+
+    start = text.find("{")
+    end = text.rfind("}")
+
+    if start == -1 or end == -1:
+        raise ValueError("AI did not return valid JSON.")
+
+    return json.loads(text[start:end + 1])
+
+
+def show_diagram(dot_code, title):
+    """Display a visual Graphviz diagram."""
+    st.subheader(title)
+
+    if not isinstance(dot_code, str):
+        st.warning("Diagram could not be generated.")
+        return
+
+    dot_code = dot_code.strip()
+
+    if not dot_code.startswith("digraph") or not dot_code.endswith("}"):
+        st.warning("The diagram format was invalid.")
+        return
+
+    try:
+        st.graphviz_chart(dot_code, use_container_width=True)
+    except Exception:
+        st.warning("Unable to display this diagram. Please regenerate it.")
+
+
 # ==========================================
 # COURSE DATABASE
 # ==========================================
 
 school_courses = [
-    "Class 6",
-    "Class 7",
-    "Class 8",
-    "Class 9",
-    "Class 10",
-    "Class 11",
-    "Class 12"
+    "Class 6", "Class 7", "Class 8", "Class 9",
+    "Class 10", "Class 11", "Class 12"
 ]
 
 college_courses = [
-    "BE / BTech",
-    "BSc",
-    "MSc",
-    "BSc Nursing",
-    "GNM Nursing",
-    "ANM Nursing",
-    "MBBS",
-    "BAMS",
-    "BHMS",
-    "BUMS",
-    "BBA",
-    "MBA",
-    "BCA",
-    "MCA",
-    "BCom",
-    "MCom",
-    "BA",
-    "MA",
-    "BPharm",
-    "MPharm",
-    "DPharm",
-    "BPT",
-    "MPT",
-    "LLB",
-    "LLM",
-    "BEd",
-    "MEd",
+    "BE / BTech", "BSc", "MSc", "BSc Nursing",
+    "GNM Nursing", "ANM Nursing", "MBBS", "BAMS",
+    "BHMS", "BUMS", "BBA", "MBA", "BCA", "MCA",
+    "BCom", "MCom", "BA", "MA", "BPharm",
+    "MPharm", "DPharm", "BPT", "MPT", "LLB",
+    "LLM", "BEd", "MEd",
     "Diploma - Electrical",
     "Diploma - Mechanical",
     "Diploma - Civil",
@@ -107,59 +114,37 @@ college_courses = [
 ]
 
 competitive_exams = [
-    "NEET UG",
-    "JEE Main",
-    "JEE Advanced",
-    "KCET",
-    "COMEDK",
-    "CUET",
-    "UPSC",
-    "SSC",
-    "IBPS Banking",
-    "SBI Banking",
-    "NDA",
-    "CDS",
-    "CAT",
-    "GATE",
-    "CLAT",
-    "Other Competitive Exam"
+    "NEET UG", "JEE Main", "JEE Advanced",
+    "KCET", "COMEDK", "CUET", "UPSC", "SSC",
+    "IBPS Banking", "SBI Banking", "NDA", "CDS",
+    "CAT", "GATE", "CLAT", "Other Competitive Exam"
 ]
 
 
 # ==========================================
-# SIDEBAR - LEARNING PROFILE
+# SIDEBAR
 # ==========================================
 
 st.sidebar.title("🎓 Learning Profile")
 
 category = st.sidebar.selectbox(
     "Choose your category",
-    [
-        "School",
-        "College",
-        "Competitive Exams"
-    ]
+    ["School", "College", "Competitive Exams"]
 )
 
 if category == "School":
-
     course = st.sidebar.selectbox(
-        "Choose your class",
-        school_courses
+        "Choose your class", school_courses
     )
 
 elif category == "College":
-
     course = st.sidebar.selectbox(
-        "Choose your course",
-        college_courses
+        "Choose your course", college_courses
     )
 
 else:
-
     course = st.sidebar.selectbox(
-        "Choose your exam",
-        competitive_exams
+        "Choose your exam", competitive_exams
     )
 
 subject = st.sidebar.text_input(
@@ -174,11 +159,7 @@ topic = st.sidebar.text_input(
 
 language = st.sidebar.selectbox(
     "Output Language",
-    [
-        "English",
-        "Kannada",
-        "Hindi"
-    ]
+    ["English", "Kannada", "Hindi"]
 )
 
 st.sidebar.caption(
@@ -201,33 +182,27 @@ notes_tab, questions_tab, quiz_tab, about_tab = st.tabs(
 
 
 # ==========================================
-# TAB 1 - DETAILED STUDY NOTES
+# TAB 1 - VISUAL STUDY NOTES
 # ==========================================
 
 with notes_tab:
 
-    st.header("📚 Detailed Study Notes")
+    st.header("📚 Smart Visual Study Notes")
 
     depth = st.selectbox(
         "Choose Explanation Depth",
-        [
-            "Basic",
-            "Detailed",
-            "In-depth"
-        ]
+        ["Basic", "Detailed", "In-depth"]
     )
 
     include_examples = st.checkbox(
-        "Include examples",
-        value=True
+        "Include examples", value=True
     )
 
     include_exam_points = st.checkbox(
-        "Include important exam points",
-        value=True
+        "Include important exam points", value=True
     )
 
-    if st.button("Generate Study Notes"):
+    if st.button("🚀 Generate Study Notes"):
 
         if not subject.strip() or not topic.strip():
 
@@ -240,54 +215,120 @@ with notes_tab:
             prompt = f"""
 You are an expert teacher and educational content creator.
 
-Create comprehensive educational notes.
+Create educational study material in {language}.
 
 Category: {category}
 Course or Exam: {course}
 Subject: {subject}
 Topic: {topic}
 Explanation Depth: {depth}
-Language: {language}
 
-Follow these instructions:
+Examples required: {include_examples}
+Exam points required: {include_exam_points}
 
-1. Give a clear introduction.
-2. Explain the topic step by step.
-3. Include important definitions.
-4. Explain concepts in sufficient depth.
-5. Include relevant subtopics.
-6. Include formulas and derivations wherever applicable.
-7. Explain practical applications.
-8. Include examples: {include_examples}.
-9. Include important examination points: {include_exam_points}.
-10. Explain common mistakes and misconceptions.
-11. Finish with a detailed summary.
-12. Include important keywords.
+Return ONLY valid JSON in this exact structure:
 
-For engineering, include technical explanations.
-For nursing and medical courses, use accurate
-educational terminology.
-For NEET and JEE, focus on relevant examination concepts.
-For school students, use age-appropriate explanations.
+{{
+  "notes": "Markdown study notes here",
+  "flowchart_dot": "digraph G {{ rankdir=TB; node [shape=box]; A [label=\\"Start\\"]; B [label=\\"Step 1\\"]; A -> B; }}",
+  "mindmap_dot": "digraph G {{ node [shape=box]; A [label=\\"Main Topic\\"]; B [label=\\"Subtopic\\"]; A -> B; }}"
+}}
 
-Do not give unnecessarily short answers.
-Do not invent facts or formulas.
-Use clear headings and subheadings.
-Mention when syllabus-specific information needs verification.
+NOTES REQUIREMENTS:
+
+1. Introduction.
+2. Clear definitions.
+3. Step-by-step explanation.
+4. Important concepts and subtopics.
+5. Formulas and derivations wherever applicable.
+6. Practical applications.
+7. Examples if requested.
+8. Important exam points if requested.
+9. Common mistakes.
+10. Summary and important keywords.
+
+FLOWCHART REQUIREMENTS:
+
+- Create an actual visual flowchart using Graphviz DOT.
+- Use boxes, arrows and meaningful connections.
+- Explain the sequence or working process of the topic.
+- Include appropriate labels.
+- Use a top-to-bottom layout.
+- Do not create a generic flowchart unrelated to the topic.
+
+MIND MAP REQUIREMENTS:
+
+- Create an actual visual mind map using Graphviz DOT.
+- Put the main topic at the centre.
+- Connect important subtopics as branches.
+- Add smaller branches for related concepts.
+- Use different node shapes for the main topic and subtopics.
+- Use readable labels.
+- Make it relevant to the selected topic.
+
+IMPORTANT:
+
+- Both diagrams must be valid Graphviz DOT.
+- Use simple node IDs such as A, B, C.
+- Use double quotes around labels.
+- Do not put Markdown code fences around DOT.
+- Escape quotation marks correctly for JSON.
+- Do not put any text outside the JSON.
+- Do not invent facts or formulas.
+- Match the selected educational level.
 """
 
-            with st.spinner("Creating detailed notes..."):
+            with st.spinner(
+                "Creating notes, flowchart and mind map... Please wait."
+            ):
 
                 try:
 
                     result = ask_ai(prompt)
+                    data = extract_json(result)
 
-                    st.markdown(result)
+                    notes = data.get("notes", "")
+                    flowchart = data.get("flowchart_dot", "")
+                    mindmap = data.get("mindmap_dot", "")
+
+                    if not notes.strip():
+                        raise ValueError("Study notes were empty.")
+
+                    st.success("Your study material is ready!")
+
+                    st.markdown("## 📖 Study Notes")
+                    st.markdown(notes)
+
+                    st.markdown("---")
+
+                    show_diagram(
+                        flowchart,
+                        "🔄 Topic Flowchart"
+                    )
+
+                    st.markdown("---")
+
+                    st.markdown("## 🧠 Visual Mind Map")
+
+                    show_diagram(
+                        mindmap,
+                        "Main Topic and Its Connections"
+                    )
+
+                    download_content = (
+                        "# TECHNOVA AI - STUDY NOTES\n\n"
+                        + notes
+                        + "\n\n# FLOWCHART DOT CODE\n\n"
+                        + flowchart
+                        + "\n\n# MIND MAP DOT CODE\n\n"
+                        + mindmap
+                    )
 
                     st.download_button(
-                        "⬇️ Download Notes",
-                        data=result,
-                        file_name="TECHNOVA_Study_Notes.txt"
+                        "⬇️ Download Study Material",
+                        data=download_content,
+                        file_name="TECHNOVA_Visual_Study_Notes.md",
+                        mime="text/markdown"
                     )
 
                 except Exception as e:
@@ -336,8 +377,7 @@ Subject: {subject}
 Topic: {topic}
 Language: {language}
 
-Generate important questions for:
-{marks} marks.
+Generate important questions for {marks} marks.
 
 For 2-mark questions:
 Give concise and complete answers.
@@ -347,7 +387,7 @@ Give structured explanations with examples.
 
 For 10-mark questions:
 Give detailed answers with headings,
-subheadings, examples and diagrams described in text.
+subheadings, examples and diagram descriptions.
 
 Include:
 1. Important examination questions.
@@ -397,11 +437,7 @@ with quiz_tab:
 
     difficulty = st.selectbox(
         "Difficulty Level",
-        [
-            "Easy",
-            "Medium",
-            "Hard"
-        ]
+        ["Easy", "Medium", "Hard"]
     )
 
     if st.button("Generate Quiz"):
@@ -458,25 +494,11 @@ Rules:
                 try:
 
                     result = ask_ai(prompt)
-
-                    match = re.search(
-                        r"\{.*\}",
-                        result,
-                        re.DOTALL
-                    )
-
-                    if not match:
-
-                        raise ValueError(
-                            "AI returned an invalid quiz format."
-                        )
-
-                    quiz_data = json.loads(match.group())
+                    quiz_data = extract_json(result)
 
                     quiz_questions = quiz_data["questions"]
 
                     if len(quiz_questions) != number:
-
                         raise ValueError(
                             "Incorrect number of questions."
                         )
@@ -488,13 +510,11 @@ Rules:
                             or q["answer"] not in q["options"]
                             or not q.get("explanation")
                         ):
-
                             raise ValueError(
                                 "One or more quiz questions are invalid."
                             )
 
                     st.session_state.quiz_data = quiz_questions
-
                     st.session_state.quiz_submitted = False
 
                     st.session_state.quiz_version = (
@@ -510,7 +530,6 @@ Rules:
                     st.error(
                         f"Quiz generation failed: {e}"
                     )
-
 
     if "quiz_data" in st.session_state:
 
@@ -561,9 +580,7 @@ Rules:
                         )
 
                         st.session_state.quiz_answers = answers
-
                         st.session_state.quiz_score = score
-
                         st.session_state.quiz_submitted = True
 
                         st.rerun()
@@ -571,9 +588,7 @@ Rules:
         else:
 
             score = st.session_state.quiz_score
-
             total = len(quiz_questions)
-
             percentage = (score / total) * 100
 
             st.success(
@@ -617,9 +632,7 @@ Rules:
             if st.button("Try Another Quiz"):
 
                 del st.session_state.quiz_data
-
                 st.session_state.quiz_submitted = False
-
                 st.session_state.quiz_answers = {}
 
                 st.rerun()
@@ -642,6 +655,10 @@ with about_tab:
 
     📚 Detailed topic-wise study notes
 
+    🔄 Visual topic flowcharts
+
+    🧠 Visual mind maps
+
     📝 Important question banks
 
     🧠 Interactive MCQ quizzes
@@ -658,7 +675,7 @@ with about_tab:
 
 
 # ==========================================
-# FOOTER - CREATOR SIGNATURE
+# FOOTER
 # ==========================================
 
 st.markdown("---")
