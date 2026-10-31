@@ -44,9 +44,9 @@ def ask_ai(prompt):
 
     return response.text
 
-
 def extract_json(text):
-    """Extract JSON safely from an AI response."""
+    """Extract and repair JSON from an AI response."""
+
     text = text.strip()
 
     text = re.sub(
@@ -64,7 +64,16 @@ def extract_json(text):
     if start == -1 or end == -1:
         raise ValueError("AI did not return valid JSON.")
 
-    return json.loads(text[start:end + 1])
+    json_text = text[start:end + 1]
+
+    # Repair invalid backslash escapes
+    json_text = re.sub(
+        r'\\(?!["\\/bfnrtu])',
+        r'\\\\',
+        json_text
+    )
+
+    return json.loads(json_text)
 
 
 def show_diagram(dot_code, title):
