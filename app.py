@@ -36,7 +36,7 @@ except Exception:
     )
     st.stop()
 
-MODEL = "gemini-3.8-flash-lite"
+MODEL = "gemini-3.5-flash-lite"
 
 
 def ask_ai(prompt):
