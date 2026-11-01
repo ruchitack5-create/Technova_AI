@@ -1,708 +1,399 @@
 import streamlit as st
 import json
 import re
+import io
+import os
+import html
+
 from google import genai
 
-# ==========================================
-# PAGE CONFIGURATION
-# ==========================================
-
-st.set_page_config(
-    page_title="TECHNOVA AI",
-    page_icon="🚀",
-    layout="wide"
+from reportlab.lib.pagesizes import A4
+from reportlab.lib import colors
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer
 )
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+def create_study_pdf(content, style="Digital"):
 
-st.title("🚀 TECHNOVA AI")
-st.subheader("Your Personal AI Learning Companion")
-st.write("Learn smarter. Practice better. Achieve more.")
+    buffer = io.BytesIO()
 
-# ==========================================
-# GEMINI API CONNECTION
-# ==========================================
-
-try:
-    client = genai.Client(
-        api_key=st.secrets["GEMINI_API_KEY"]
-    )
-except Exception:
-    st.error("API key not found. Please check Streamlit Secrets.")
-    st.stop()
-
-MODEL = "gemini-3.5-flash-lite"
-
-
-def ask_ai(prompt):
-    response = client.models.generate_content(
-        model=MODEL,
-        contents=prompt,
-        config={"max_output_tokens": 4096}
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=45,
+        leftMargin=45,
+        topMargin=55,
+        bottomMargin=50
     )
 
-    if not response.text:
-        raise ValueError("AI returned an empty response.")
+    font_name = "Helvetica"
 
-    return response.text
+    # Handwritten font
+    if style == "Handwritten":
 
-def extract_json(text):
-    """Extract and repair JSON from an AI response."""
+        font_path = os.path.join(
+            "fonts",
+            "PatrickHand-Regular.ttf"
+        )
 
-    text = text.strip()
+        if os.path.exists(font_path):
 
-    text = re.sub(
-        r"^```(?:json)?\s*",
-        "",
-        text,
-        flags=re.IGNORECASE
+            pdfmetrics.registerFont(
+                TTFont("PatrickHand", font_path)
+            )
+
+            font_name = "PatrickHand"
+
+    styles = getSampleStyleSheet()
+
+    title_style = ParagraphStyle(
+        "CustomTitle",
+        parent=styles["Title"],
+        fontName=font_name,
+        fontSize=22,
+        textColor=colors.HexColor("#2457A6"),
+        spaceAfter=20
     )
 
-    text = re.sub(r"\s*```$", "", text)
-
-    start = text.find("{")
-    end = text.rfind("}")
-
-    if start == -1 or end == -1:
-        raise ValueError("AI did not return valid JSON.")
-
-    json_text = text[start:end + 1]
-
-    # Repair invalid backslash escapes
-    json_text = re.sub(
-        r'\\(?!["\\/bfnrtu])',
-        r'\\\\',
-        json_text
+    heading_style = ParagraphStyle(
+        "CustomHeading",
+        parent=styles["Heading2"],
+        fontName=font_name,
+        fontSize=16,
+        textColor=colors.HexColor("#1565C0"),
+        spaceBefore=12,
+        spaceAfter=8
     )
 
-    return json.loads(json_text)
-
-
-def show_diagram(dot_code, title):
-    """Display a visual Graphviz diagram."""
-    st.subheader(title)
-
-    if not isinstance(dot_code, str):
-        st.warning("Diagram could not be generated.")
-        return
-
-    dot_code = dot_code.strip()
-
-    if not dot_code.startswith("digraph") or not dot_code.endswith("}"):
-        st.warning("The diagram format was invalid.")
-        return
-
-    try:
-        st.graphviz_chart(dot_code, use_container_width=True)
-    except Exception:
-        st.warning("Unable to display this diagram. Please regenerate it.")
-
-
-# ==========================================
-# COURSE DATABASE
-# ==========================================
-
-school_courses = [
-    "Class 6", "Class 7", "Class 8", "Class 9",
-    "Class 10", "Class 11", "Class 12"
-]
-
-college_courses = [
-    "BE / BTech", "BSc", "MSc", "BSc Nursing",
-    "GNM Nursing", "ANM Nursing", "MBBS", "BAMS",
-    "BHMS", "BUMS", "BBA", "MBA", "BCA", "MCA",
-    "BCom", "MCom", "BA", "MA", "BPharm",
-    "MPharm", "DPharm", "BPT", "MPT", "LLB",
-    "LLM", "BEd", "MEd",
-    "Diploma - Electrical",
-    "Diploma - Mechanical",
-    "Diploma - Civil",
-    "Diploma - Computer Science",
-    "Diploma - Electronics",
-    "Diploma - Automobile",
-    "Diploma - Chemical",
-    "Diploma - Architecture"
-]
-
-competitive_exams = [
-    "NEET UG", "JEE Main", "JEE Advanced",
-    "KCET", "COMEDK", "CUET", "UPSC", "SSC",
-    "IBPS Banking", "SBI Banking", "NDA", "CDS",
-    "CAT", "GATE", "CLAT", "Other Competitive Exam"
-]
-
-
-# ==========================================
-# SIDEBAR
-# ==========================================
-
-st.sidebar.title("🎓 Learning Profile")
-
-category = st.sidebar.selectbox(
-    "Choose your category",
-    ["School", "College", "Competitive Exams"]
-)
-
-if category == "School":
-    course = st.sidebar.selectbox(
-        "Choose your class", school_courses
+    body_style = ParagraphStyle(
+        "CustomBody",
+        parent=styles["BodyText"],
+        fontName=font_name,
+        fontSize=12,
+        leading=19,
+        spaceAfter=8
     )
 
-elif category == "College":
-    course = st.sidebar.selectbox(
-        "Choose your course", college_courses
-    )
+    story = []
 
-else:
-    course = st.sidebar.selectbox(
-        "Choose your exam", competitive_exams
-    )
+    for line in content.split("\n"):
 
-subject = st.sidebar.text_input(
-    "Subject",
-    placeholder="Example: Physics"
-)
+        line = line.strip()
 
-topic = st.sidebar.text_input(
-    "Topic / Concept",
-    placeholder="Example: Laws of Motion"
-)
+        if not line:
+            story.append(Spacer(1, 6))
+            continue
 
-language = st.sidebar.selectbox(
-    "Output Language",
-    ["English", "Kannada", "Hindi"]
-)
+        safe_line = html.escape(line)
 
-st.sidebar.caption(
-    "Select your course and enter a topic to begin."
-)
+        safe_line = re.sub(
+            r"\*\*(.*?)\*\*",
+            r"<b>\1</b>",
+            safe_line
+        )
 
+        if line.startswith("# "):
 
-# ==========================================
-# MAIN TABS
-# ==========================================
+            story.append(
+                Paragraph(
+                    html.escape(line[2:]),
+                    title_style
+                )
+            )
 
-notes_tab, questions_tab, quiz_tab, about_tab = st.tabs(
+        elif line.startswith("## ") or line.startswith("### "):
+
+            heading = line.lstrip("#").strip()
+
+            story.append(
+                Paragraph(
+                    html.escape(heading),
+                    heading_style
+                )
+            )
+
+        elif line.startswith("- ") or line.startswith("* "):
+
+            story.append(
+                Paragraph(
+                    "• " + safe_line[2:],
+                    body_style
+                )
+            )
+
+        else:
+
+            story.append(
+                Paragraph(
+                    safe_line,
+                    body_style
+                )
+            )
+
+    def notebook_background(canvas, doc):
+
+        canvas.saveState()
+
+        canvas.setStrokeColor(
+            colors.HexColor("#DCE8F5")
+        )
+
+        canvas.setLineWidth(0.4)
+
+        for y in range(40, 800, 22):
+
+            canvas.line(35, y, 560, y)
+
+        canvas.setStrokeColor(
+            colors.HexColor("#F2A0A0")
+        )
+
+        canvas.line(55, 30, 55, 810)
+
+        canvas.restoreState()
+
+    if style == "Handwritten":
+
+        doc.build(
+            story,
+            onFirstPage=notebook_background,
+            onLaterPages=notebook_background
+        )
+
+    else:
+
+        doc.build(story)
+
+    buffer.seek(0)
+
+    return buffer.getvalue()
+st.header("📚 Smart AI Learning Studio")
+
+output_type = st.selectbox(
+    "What would you like TECHNOVA AI to generate?",
     [
-        "📚 Study Notes",
-        "📝 Question Bank",
-        "🧠 Quiz",
-        "ℹ️ About"
+        "Detailed Study Notes",
+        "Short Revision Notes",
+        "Mind Map",
+        "Memory Tricks",
+        "Important Topics",
+        "Exam Preparation Notes"
     ]
 )
 
-
-# ==========================================
-# TAB 1 - VISUAL STUDY NOTES
-# ==========================================
-
-with notes_tab:
-
-    st.header("📚 Smart Visual Study Notes")
-
-    depth = st.selectbox(
-        "Choose Explanation Depth",
-        ["Basic", "Detailed", "In-depth"]
-    )
-
-    include_examples = st.checkbox(
-        "Include examples", value=True
-    )
-
-    include_exam_points = st.checkbox(
-        "Include important exam points", value=True
-    )
-
-    if st.button("🚀 Generate Study Notes"):
-
-        if not subject.strip() or not topic.strip():
-
-            st.warning(
-                "Please enter subject and topic in the sidebar."
-            )
-
-        else:
-
-            prompt = f"""
-You are an expert teacher and educational content creator.
-
-Create educational study material in {language}.
-
-Category: {category}
-Course or Exam: {course}
-Subject: {subject}
-Topic: {topic}
-Explanation Depth: {depth}
-
-Examples required: {include_examples}
-Exam points required: {include_exam_points}
-
-Return ONLY valid JSON in this exact structure:
-
-{{
-  "notes": "Markdown study notes here",
-  "flowchart_dot": "digraph G {{ rankdir=TB; node [shape=box]; A [label=\\"Start\\"]; B [label=\\"Step 1\\"]; A -> B; }}",
-  "mindmap_dot": "digraph G {{ node [shape=box]; A [label=\\"Main Topic\\"]; B [label=\\"Subtopic\\"]; A -> B; }}"
-}}
-
-NOTES REQUIREMENTS:
-
-1. Introduction.
-2. Clear definitions.
-3. Step-by-step explanation.
-4. Important concepts and subtopics.
-5. Formulas and derivations wherever applicable.
-6. Practical applications.
-7. Examples if requested.
-8. Important exam points if requested.
-9. Common mistakes.
-10. Summary and important keywords.
-
-FLOWCHART REQUIREMENTS:
-
-- Create an actual visual flowchart using Graphviz DOT.
-- Use boxes, arrows and meaningful connections.
-- Explain the sequence or working process of the topic.
-- Include appropriate labels.
-- Use a top-to-bottom layout.
-- Do not create a generic flowchart unrelated to the topic.
-
-MIND MAP REQUIREMENTS:
-
-- Create an actual visual mind map using Graphviz DOT.
-- Put the main topic at the centre.
-- Connect important subtopics as branches.
-- Add smaller branches for related concepts.
-- Use different node shapes for the main topic and subtopics.
-- Use readable labels.
-- Make it relevant to the selected topic.
-
-IMPORTANT:
-
-- Both diagrams must be valid Graphviz DOT.
-- Use simple node IDs such as A, B, C.
-- Use double quotes around labels.
-- Do not put Markdown code fences around DOT.
-- Escape quotation marks correctly for JSON.
-- Do not put any text outside the JSON.
-- Do not invent facts or formulas.
-- Match the selected educational level.
-"""
-
-            with st.spinner(
-                "Creating notes, flowchart and mind map... Please wait."
-            ):
-
-                try:
-
-                    result = ask_ai(prompt)
-                    data = extract_json(result)
-
-                    notes = data.get("notes", "")
-                    flowchart = data.get("flowchart_dot", "")
-                    mindmap = data.get("mindmap_dot", "")
-
-                    if not notes.strip():
-                        raise ValueError("Study notes were empty.")
-
-                    st.success("Your study material is ready!")
-
-                    st.markdown("## 📖 Study Notes")
-                    st.markdown(notes)
-
-                    st.markdown("---")
-
-                    show_diagram(
-                        flowchart,
-                        "🔄 Topic Flowchart"
-                    )
-
-                    st.markdown("---")
-
-                    st.markdown("## 🧠 Visual Mind Map")
-
-                    show_diagram(
-                        mindmap,
-                        "Main Topic and Its Connections"
-                    )
-
-                    download_content = (
-                        "# TECHNOVA AI - STUDY NOTES\n\n"
-                        + notes
-                        + "\n\n# FLOWCHART DOT CODE\n\n"
-                        + flowchart
-                        + "\n\n# MIND MAP DOT CODE\n\n"
-                        + mindmap
-                    )
-
-                    st.download_button(
-                        "⬇️ Download Study Material",
-                        data=download_content,
-                        file_name="TECHNOVA_Visual_Study_Notes.md",
-                        mime="text/markdown"
-                    )
-
-                except Exception as e:
-
-                    st.error(
-                        f"Notes generation failed: {e}"
-                    )
-
-
-# ==========================================
-# TAB 2 - QUESTION BANK
-# ==========================================
-
-with questions_tab:
-
-    st.header("📝 Important Question Bank")
-
-    marks = st.multiselect(
-        "Select Question Marks",
-        [2, 5, 10],
-        default=[2, 5, 10]
-    )
-
-    if st.button("Generate Question Bank"):
-
-        if not subject.strip() or not topic.strip():
-
-            st.warning(
-                "Please enter subject and topic in the sidebar."
-            )
-
-        elif not marks:
-
-            st.warning(
-                "Please select at least one mark category."
-            )
-
-        else:
-
-            prompt = f"""
-Act as an experienced examination question setter.
-
-Category: {category}
-Course or Exam: {course}
-Subject: {subject}
-Topic: {topic}
-Language: {language}
-
-Generate important questions for {marks} marks.
-
-For 2-mark questions:
-Give concise and complete answers.
-
-For 5-mark questions:
-Give structured explanations with examples.
-
-For 10-mark questions:
-Give detailed answers with headings,
-subheadings, examples and diagram descriptions.
-
-Include:
-1. Important examination questions.
-2. Correct and sufficiently detailed answers.
-3. Relevant examples.
-4. Important keywords.
-5. Numerical problems wherever appropriate.
-
-Avoid repeated questions.
-Match the course or examination level.
-Do not invent syllabus-specific information.
-"""
-
-            with st.spinner("Preparing question bank..."):
-
-                try:
-
-                    result = ask_ai(prompt)
-
-                    st.markdown(result)
-
-                    st.download_button(
-                        "⬇️ Download Question Bank",
-                        data=result,
-                        file_name="TECHNOVA_Question_Bank.txt"
-                    )
-
-                except Exception as e:
-
-                    st.error(
-                        f"Question generation failed: {e}"
-                    )
-
-
-# ==========================================
-# TAB 3 - INTERACTIVE QUIZ
-# ==========================================
-
-with quiz_tab:
-
-    st.header("🧠 Test Your Knowledge")
-
-    number = st.selectbox(
-        "Number of Questions",
-        [5, 10, 15]
-    )
-
-    difficulty = st.selectbox(
-        "Difficulty Level",
-        ["Easy", "Medium", "Hard"]
-    )
-
-    if st.button("Generate Quiz"):
-
-        if not subject.strip() or not topic.strip():
-
-            st.warning(
-                "Please enter subject and topic in the sidebar."
-            )
-
-        else:
-
-            prompt = f"""
-Create exactly {number} multiple-choice questions.
-
-Category: {category}
-Course or Exam: {course}
-Subject: {subject}
-Topic: {topic}
-Difficulty: {difficulty}
-Language: {language}
-
-Return ONLY valid JSON in this format:
-
-{{
-    "questions": [
-        {{
-            "question": "Question text",
-            "options": [
-                "Option A",
-                "Option B",
-                "Option C",
-                "Option D"
-            ],
-            "answer": "Exact correct option text",
-            "explanation": "Detailed explanation"
-        }}
-    ]
-}}
-
-Rules:
-- Exactly {number} questions.
-- Exactly four options per question.
-- Only one correct answer.
-- Answer must match one option exactly.
-- Give useful explanations.
-- Avoid repeated questions.
-- Ensure factual accuracy.
-- No markdown outside JSON.
-"""
-
-            with st.spinner("Creating your quiz..."):
-
-                try:
-
-                    result = ask_ai(prompt)
-                    quiz_data = extract_json(result)
-
-                    quiz_questions = quiz_data["questions"]
-
-                    if len(quiz_questions) != number:
-                        raise ValueError(
-                            "Incorrect number of questions."
-                        )
-
-                    for q in quiz_questions:
-
-                        if (
-                            len(q["options"]) != 4
-                            or q["answer"] not in q["options"]
-                            or not q.get("explanation")
-                        ):
-                            raise ValueError(
-                                "One or more quiz questions are invalid."
-                            )
-
-                    st.session_state.quiz_data = quiz_questions
-                    st.session_state.quiz_submitted = False
-
-                    st.session_state.quiz_version = (
-                        st.session_state.get("quiz_version", 0) + 1
-                    )
-
-                    st.session_state.quiz_answers = {}
-
-                    st.rerun()
-
-                except Exception as e:
-
-                    st.error(
-                        f"Quiz generation failed: {e}"
-                    )
-
-    if "quiz_data" in st.session_state:
-
-        quiz_questions = st.session_state.quiz_data
-
-        if not st.session_state.quiz_submitted:
-
-            with st.form("quiz_form"):
-
-                answers = {}
-
-                for i, q in enumerate(quiz_questions):
-
-                    st.markdown(
-                        f"**Q{i + 1}. {q['question']}**"
-                    )
-
-                    answers[i] = st.radio(
-                        "Choose your answer:",
-                        q["options"],
-                        index=None,
-                        key=(
-                            f"quiz_{st.session_state.quiz_version}_{i}"
-                        )
-                    )
-
-                submitted = st.form_submit_button(
-                    "Submit Quiz"
-                )
-
-                if submitted:
-
-                    if any(
-                        answer is None
-                        for answer in answers.values()
-                    ):
-
-                        st.warning(
-                            "Please answer every question."
-                        )
-
-                    else:
-
-                        score = sum(
-                            1
-                            for i, q in enumerate(quiz_questions)
-                            if answers[i] == q["answer"]
-                        )
-
-                        st.session_state.quiz_answers = answers
-                        st.session_state.quiz_score = score
-                        st.session_state.quiz_submitted = True
-
-                        st.rerun()
-
-        else:
-
-            score = st.session_state.quiz_score
-            total = len(quiz_questions)
-            percentage = (score / total) * 100
-
-            st.success(
-                f"Your Score: {score}/{total}"
-            )
-
-            st.write(
-                f"Your Percentage: {percentage:.1f}%"
-            )
-
-            for i, q in enumerate(quiz_questions):
-
-                st.markdown(
-                    f"**Q{i + 1}. {q['question']}**"
-                )
-
-                user_answer = (
-                    st.session_state.quiz_answers[i]
-                )
-
-                if user_answer == q["answer"]:
-
-                    st.success(
-                        f"Your answer: {user_answer}"
-                    )
-
-                else:
-
-                    st.error(
-                        f"Your answer: {user_answer}"
-                    )
-
-                    st.info(
-                        f"Correct answer: {q['answer']}"
-                    )
-
-                st.write(
-                    f"Explanation: {q['explanation']}"
-                )
-
-            if st.button("Try Another Quiz"):
-
-                del st.session_state.quiz_data
-                st.session_state.quiz_submitted = False
-                st.session_state.quiz_answers = {}
-
-                st.rerun()
-
-
-# ==========================================
-# TAB 4 - ABOUT TECHNOVA AI
-# ==========================================
-
-with about_tab:
-
-    st.header("About TECHNOVA AI")
-
-    st.write("""
-    TECHNOVA AI is an AI-powered educational platform
-    designed for school students, college students
-    and competitive examination aspirants.
-
-    Our features:
-
-    📚 Detailed topic-wise study notes
-
-    🔄 Visual topic flowcharts
-
-    🧠 Visual mind maps
-
-    📝 Important question banks
-
-    🧠 Interactive MCQ quizzes
-
-    🎓 Multiple educational courses
-
-    🎯 Competitive examination preparation
-
-    Our mission is to make learning easier,
-    smarter and more accessible.
-
-    Learn. Practice. Improve. Succeed.
-    """)
-
-
-# ==========================================
-# FOOTER
-# ==========================================
-
-st.markdown("---")
-
-st.markdown(
-    """
-    <h3 style="text-align:center;">
-        TECHNOVA AI 🚀
-    </h3>
-    """,
-    unsafe_allow_html=True
+depth = st.selectbox(
+    "Explanation Level",
+    ["Basic", "Detailed", "Advanced"]
 )
 
+note_style = st.radio(
+    "Choose your notes format",
+    [
+        "Handwritten Notebook Style",
+        "Digital Colourful Style"
+    ],
+    horizontal=True
+)
+
+include_examples = st.checkbox(
+    "Include real-life and textbook examples",
+    value=True
+)
+
+include_exam_points = st.checkbox(
+    "Highlight important examination points",
+    value=True
+)
+
+include_diagrams = st.checkbox(
+    "Include topic-related diagrams",
+    value=True
+)
+
+include_memory = st.checkbox(
+    "Include memory tricks",
+    value=True
+)
+
+if st.button("🚀 Generate Learning Material"):
+
+    if not subject.strip() or not topic.strip():
+
+        st.warning("Enter your subject and topic first.")
+
+    else:
+
+        prompt = f"""
+You are TECHNOVA AI, an expert subject-specific
+teacher and examination preparation assistant.
+
+SELECTED INFORMATION:
+
+Category: {category}
+Course: {course}
+Subject: {subject}
+Topic: {topic}
+Language: {language}
+Level: {depth}
+Requested Output: {output_type}
+
+IMPORTANT SUBJECT RULES:
+
+1. Follow the selected subject strictly.
+2. Do not mix unrelated subjects.
+3. Do not generate mathematics formulas for English literature.
+4. Do not generate literary analysis for Physics.
+5. Generate formulas only when relevant to the selected topic.
+6. For English literature, provide summaries,
+   characters, themes and literary analysis.
+7. For Biology, provide classifications,
+   characteristics and correct scientific examples.
+8. For Chemistry, provide chemical equations,
+   reactions and periodic table information where relevant.
+9. For Physics, provide laws, formulas,
+   SI units and numerical examples where relevant.
+10. For Mathematics, provide formulas,
+    derivations and step-by-step solutions.
+11. If the topic does not belong to the selected subject,
+    politely identify the mismatch.
+
+CONTENT REQUIREMENTS:
+
+Examples: {include_examples}
+Exam points: {include_exam_points}
+Diagrams: {include_diagrams}
+Memory tricks: {include_memory}
+
+Create content specifically for the requested output type.
+
+If Detailed Study Notes:
+Provide introduction, definitions, explanations,
+examples, important concepts and summary.
+
+If Short Revision Notes:
+Provide concise points, definitions and essential facts.
+
+If Mind Map:
+Create a structured visual hierarchy using
+a readable text-based tree.
+
+If Memory Tricks:
+Create meaningful mnemonics, shortcuts and
+easy memorisation techniques.
+
+If Important Topics:
+Identify concepts worth prioritising for revision.
+Do not claim previous-year frequency unless
+actual previous-year papers are provided.
+
+If Exam Preparation Notes:
+Provide exam-oriented explanations,
+important definitions and practice questions.
+
+Use clear Markdown formatting.
+
+Use headings, subheadings, bullet points and tables.
+
+Do not return JSON.
+Do not return code.
+Do not include unrelated information.
+Do not invent examination statistics.
+
+Return only the requested educational content.
+"""
+
+        with st.spinner(
+            "TECHNOVA AI is preparing your learning material..."
+        ):
+
+            try:
+
+                result = ask_ai(prompt)
+
+                if not result.strip():
+                    raise ValueError("Empty AI response.")
+
+                st.session_state.generated_notes = result
+                st.session_state.generated_style = note_style
+
+                st.success("Learning material generated!")
+
+            except Exception as e:
+
+                st.error(
+                    f"Generation failed: {e}"
+                )
+if "generated_notes" in st.session_state:
+
+    content = st.session_state.generated_notes
+
+    st.markdown("---")
+
+    st.markdown("## 📖 Your Learning Material")
+
+    st.markdown(content)
+
+    st.markdown("---")
+
+    st.subheader("📥 Download Your Notes")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        if st.button("✍️ Create Handwritten PDF"):
+
+            try:
+
+                pdf = create_study_pdf(
+                    content,
+                    "Handwritten"
+                )
+
+                st.download_button(
+                    "Download Handwritten Notes",
+                    data=pdf,
+                    file_name="TECHNOVA_Handwritten_Notes.pdf",
+                    mime="application/pdf"
+                )
+
+            except Exception as e:
+
+                st.error(f"PDF error: {e}")
+
+    with col2:
+
+        if st.button("💻 Create Digital PDF"):
+
+            try:
+
+                pdf = create_study_pdf(
+                    content,
+                    "Digital"
+                )
+
+                st.download_button(
+                    "Download Digital Notes",
+                    data=pdf,
+                    file_name="TECHNOVA_Digital_Notes.pdf",
+                    mime="application/pdf"
+                )
+
+            except Exception as e:
+
+                st.error(f"PDF error: {e}")
+
+    st.download_button(
+        "⬇️ Download Markdown Notes",
+        data=content,
+        file_name="TECHNOVA_Notes.md",
+        mime="text/markdown"
+    )
 st.markdown(
-    """
-    <p style="text-align:center; font-size:16px;">
-        Built with ❤️ by <b>Ruchita</b>
-    </p>
-    """,
+    "<div style='text-align:center;'>Created by ❤️ Ruchita</div>",
     unsafe_allow_html=True
 )
