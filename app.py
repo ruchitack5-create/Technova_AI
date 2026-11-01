@@ -1,399 +1,674 @@
 import streamlit as st
-import json
-import re
-import io
-import os
-import html
-
 from google import genai
+import time
 
-from reportlab.lib.pagesizes import A4
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import (
-    SimpleDocTemplate,
-    Paragraph,
-    Spacer
+# ==========================================
+# PAGE CONFIGURATION
+# ==========================================
+
+st.set_page_config(
+    page_title="TECHNOVA AI",
+    page_icon="🚀",
+    layout="wide"
 )
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-def create_study_pdf(content, style="Digital"):
 
-    buffer = io.BytesIO()
+# ==========================================
+# GEMINI CONFIGURATION
+# ==========================================
 
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        rightMargin=45,
-        leftMargin=45,
-        topMargin=55,
-        bottomMargin=50
-    )
+client = genai.Client(
+    api_key=st.secrets["GEMINI_API_KEY"]
+)
 
-    font_name = "Helvetica"
+MODEL = "gemini-3.5-flash-lite"
 
-    # Handwritten font
-    if style == "Handwritten":
+# ==========================================
+# CUSTOM DESIGN
+# ==========================================
 
-        font_path = os.path.join(
-            "fonts",
-            "PatrickHand-Regular.ttf"
+st.markdown("""
+<style>
+
+.main {
+    background-color: #0e1117;
+}
+
+.stButton>button {
+    width: 100%;
+    border-radius: 10px;
+    height: 45px;
+    background-color: #2563eb;
+    color: white;
+    font-weight: bold;
+}
+
+.stButton>button:hover {
+    background-color: #1d4ed8;
+    color: white;
+}
+
+h1 {
+    color: #60a5fa;
+}
+
+h2, h3 {
+    color: #38bdf8;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# HEADER
+# ==========================================
+
+st.title("🚀 TECHNOVA AI")
+
+st.subheader("Your Personal AI Learning Companion")
+
+st.caption(
+    "Learn smarter | Prepare better | Achieve more"
+)
+
+st.divider()
+
+# ==========================================
+# SESSION STATE
+# ==========================================
+
+if "results" not in st.session_state:
+    st.session_state.results = {}
+
+# ==========================================
+# AI GENERATION FUNCTION
+# ==========================================
+
+def generate_ai(prompt, max_tokens=3500):
+
+    try:
+
+        response = client.models.generate_content(
+            model=MODEL,
+            contents=prompt,
+            config={
+                "temperature": 0.4,
+                "max_output_tokens": max_tokens
+            }
         )
 
-        if os.path.exists(font_path):
+        if response.text:
+            return response.text
 
-            pdfmetrics.registerFont(
-                TTFont("PatrickHand", font_path)
+        return "No response generated. Please try again."
+
+    except Exception as e:
+
+        error = str(e)
+
+        if "503" in error or "UNAVAILABLE" in error:
+            return (
+                "⚠️ Gemini servers are currently busy. "
+                "Please try again after a few seconds."
             )
 
-            font_name = "PatrickHand"
+        if "429" in error or "RESOURCE_EXHAUSTED" in error:
+            return (
+                "⚠️ API usage limit reached. "
+                "Please try again later."
+            )
 
-    styles = getSampleStyleSheet()
+        return f"⚠️ Generation error: {error}"
 
-    title_style = ParagraphStyle(
-        "CustomTitle",
-        parent=styles["Title"],
-        fontName=font_name,
-        fontSize=22,
-        textColor=colors.HexColor("#2457A6"),
-        spaceAfter=20
+
+# ==========================================
+# COMMON INPUTS
+# ==========================================
+
+st.header("📚 Learning Dashboard")
+
+col1, col2 = st.columns(2)
+
+with col1:
+
+    level = st.selectbox(
+        "Select Education Level",
+        [
+            "School",
+            "Diploma",
+            "Engineering",
+            "Degree"
+        ]
     )
 
-    heading_style = ParagraphStyle(
-        "CustomHeading",
-        parent=styles["Heading2"],
-        fontName=font_name,
-        fontSize=16,
-        textColor=colors.HexColor("#1565C0"),
-        spaceBefore=12,
-        spaceAfter=8
+with col2:
+
+    subject = st.selectbox(
+        "Select Subject",
+        [
+            "Artificial Intelligence",
+            "Machine Learning",
+            "Data Structures and Algorithms",
+            "Python Programming",
+            "Java Programming",
+            "C Programming",
+            "Computer Science",
+            "Mathematics",
+            "Physics",
+            "Chemistry",
+            "Biology",
+            "English",
+            "Kannada",
+            "Electronics",
+            "Electrical Engineering",
+            "Database Management",
+            "Operating Systems",
+            "Computer Networks",
+            "Other"
+        ]
     )
 
-    body_style = ParagraphStyle(
-        "CustomBody",
-        parent=styles["BodyText"],
-        fontName=font_name,
-        fontSize=12,
-        leading=19,
-        spaceAfter=8
+if subject == "Other":
+
+    subject = st.text_input(
+        "Enter your subject name"
     )
 
-    story = []
+topic = st.text_input(
+    "📖 Enter Chapter / Topic",
+    placeholder="Example: Intelligent Agents, JVM Architecture..."
+)
 
-    for line in content.split("\n"):
+col3, col4 = st.columns(2)
 
-        line = line.strip()
+with col3:
 
-        if not line:
-            story.append(Spacer(1, 6))
-            continue
+    language = st.selectbox(
+        "Select Language",
+        [
+            "Simple English",
+            "Kannada",
+            "Hindi"
+        ]
+    )
 
-        safe_line = html.escape(line)
+with col4:
 
-        safe_line = re.sub(
-            r"\*\*(.*?)\*\*",
-            r"<b>\1</b>",
-            safe_line
+    difficulty = st.selectbox(
+        "Notes Length",
+        [
+            "Short",
+            "Medium",
+            "Detailed"
+        ]
+    )
+
+st.divider()
+
+# ==========================================
+# VALIDATION
+# ==========================================
+
+def validate_inputs():
+
+    if not subject or not subject.strip():
+
+        st.error("Please select or enter a valid subject.")
+        return False
+
+    if not topic or not topic.strip():
+
+        st.error("Please enter a chapter or topic.")
+        return False
+
+    return True
+
+
+# ==========================================
+# PROMPT BUILDER
+# ==========================================
+
+def build_prompt(task):
+
+    return f"""
+You are TECHNOVA AI, an expert educational tutor.
+
+STUDENT DETAILS:
+
+Education Level: {level}
+Subject: {subject}
+Chapter / Topic: {topic}
+Language: {language}
+Difficulty: {difficulty}
+
+IMPORTANT RULES:
+
+1. Answer strictly according to the selected subject.
+2. Never mix topics from unrelated subjects.
+3. Use correct technical terminology.
+4. Explain difficult concepts in simple language.
+5. Include relevant examples.
+6. Use headings and subheadings.
+7. Avoid unnecessary explanations.
+8. Make answers useful for examinations.
+9. Do not invent factual information.
+10. If information is uncertain, clearly mention it.
+
+TASK:
+
+{task}
+
+Generate the answer in well-organized Markdown.
+"""
+
+
+# ==========================================
+# FEATURE TABS
+# ==========================================
+
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📝 AI Notes",
+    "❓ Doubt Solver",
+    "📚 Exam Preparation",
+    "🧠 Mind Maps",
+    "🎯 Mock Test"
+])
+
+
+# ==========================================
+# TAB 1 - AI NOTES
+# ==========================================
+
+with tab1:
+
+    st.header("📝 Smart AI Notes")
+
+    st.write(
+        "Generate structured notes for any chapter or topic."
+    )
+
+    if st.button("Generate AI Notes", key="notes"):
+
+        if validate_inputs():
+
+            prompt = build_prompt(f"""
+Create complete study notes for the selected chapter.
+
+Include:
+
+1. Introduction
+2. Definition
+3. Important concepts
+4. Detailed explanation
+5. Important points
+6. Relevant examples
+7. Advantages and disadvantages, if applicable
+8. Applications
+9. Important formulas, if applicable
+10. Short revision summary
+
+Notes length: {difficulty}
+
+Make the notes suitable for {level} students.
+
+Do not add unrelated formulas or concepts.
+""")
+
+            with st.spinner("Generating your study notes..."):
+
+                result = generate_ai(prompt, 4500)
+
+            st.session_state.results["notes"] = result
+
+    if "notes" in st.session_state.results:
+
+        st.markdown(st.session_state.results["notes"])
+
+        st.download_button(
+            "⬇️ Download Notes",
+            data=st.session_state.results["notes"],
+            file_name="TECHNOVA_AI_Notes.txt",
+            mime="text/plain"
         )
 
-        if line.startswith("# "):
 
-            story.append(
-                Paragraph(
-                    html.escape(line[2:]),
-                    title_style
-                )
-            )
+# ==========================================
+# TAB 2 - DOUBT SOLVER
+# ==========================================
 
-        elif line.startswith("## ") or line.startswith("### "):
+with tab2:
 
-            heading = line.lstrip("#").strip()
+    st.header("❓ AI Doubt Solver")
 
-            story.append(
-                Paragraph(
-                    html.escape(heading),
-                    heading_style
-                )
-            )
+    doubt = st.text_area(
+        "Ask your question",
+        placeholder="Type your doubt here...",
+        height=120
+    )
 
-        elif line.startswith("- ") or line.startswith("* "):
+    if st.button("Solve My Doubt"):
 
-            story.append(
-                Paragraph(
-                    "• " + safe_line[2:],
-                    body_style
-                )
-            )
+        if not doubt.strip():
+
+            st.warning("Please enter your question.")
 
         else:
 
-            story.append(
-                Paragraph(
-                    safe_line,
-                    body_style
-                )
-            )
+            prompt = f"""
+You are an expert tutor.
 
-    def notebook_background(canvas, doc):
-
-        canvas.saveState()
-
-        canvas.setStrokeColor(
-            colors.HexColor("#DCE8F5")
-        )
-
-        canvas.setLineWidth(0.4)
-
-        for y in range(40, 800, 22):
-
-            canvas.line(35, y, 560, y)
-
-        canvas.setStrokeColor(
-            colors.HexColor("#F2A0A0")
-        )
-
-        canvas.line(55, 30, 55, 810)
-
-        canvas.restoreState()
-
-    if style == "Handwritten":
-
-        doc.build(
-            story,
-            onFirstPage=notebook_background,
-            onLaterPages=notebook_background
-        )
-
-    else:
-
-        doc.build(story)
-
-    buffer.seek(0)
-
-    return buffer.getvalue()
-st.header("📚 Smart AI Learning Studio")
-
-output_type = st.selectbox(
-    "What would you like TECHNOVA AI to generate?",
-    [
-        "Detailed Study Notes",
-        "Short Revision Notes",
-        "Mind Map",
-        "Memory Tricks",
-        "Important Topics",
-        "Exam Preparation Notes"
-    ]
-)
-
-depth = st.selectbox(
-    "Explanation Level",
-    ["Basic", "Detailed", "Advanced"]
-)
-
-note_style = st.radio(
-    "Choose your notes format",
-    [
-        "Handwritten Notebook Style",
-        "Digital Colourful Style"
-    ],
-    horizontal=True
-)
-
-include_examples = st.checkbox(
-    "Include real-life and textbook examples",
-    value=True
-)
-
-include_exam_points = st.checkbox(
-    "Highlight important examination points",
-    value=True
-)
-
-include_diagrams = st.checkbox(
-    "Include topic-related diagrams",
-    value=True
-)
-
-include_memory = st.checkbox(
-    "Include memory tricks",
-    value=True
-)
-
-if st.button("🚀 Generate Learning Material"):
-
-    if not subject.strip() or not topic.strip():
-
-        st.warning("Enter your subject and topic first.")
-
-    else:
-
-        prompt = f"""
-You are TECHNOVA AI, an expert subject-specific
-teacher and examination preparation assistant.
-
-SELECTED INFORMATION:
-
-Category: {category}
-Course: {course}
+Student Level: {level}
 Subject: {subject}
-Topic: {topic}
+Chapter: {topic}
 Language: {language}
-Level: {depth}
-Requested Output: {output_type}
 
-IMPORTANT SUBJECT RULES:
+Student Question:
 
-1. Follow the selected subject strictly.
-2. Do not mix unrelated subjects.
-3. Do not generate mathematics formulas for English literature.
-4. Do not generate literary analysis for Physics.
-5. Generate formulas only when relevant to the selected topic.
-6. For English literature, provide summaries,
-   characters, themes and literary analysis.
-7. For Biology, provide classifications,
-   characteristics and correct scientific examples.
-8. For Chemistry, provide chemical equations,
-   reactions and periodic table information where relevant.
-9. For Physics, provide laws, formulas,
-   SI units and numerical examples where relevant.
-10. For Mathematics, provide formulas,
-    derivations and step-by-step solutions.
-11. If the topic does not belong to the selected subject,
-    politely identify the mismatch.
+{doubt}
 
-CONTENT REQUIREMENTS:
+Instructions:
 
-Examples: {include_examples}
-Exam points: {include_exam_points}
-Diagrams: {include_diagrams}
-Memory tricks: {include_memory}
-
-Create content specifically for the requested output type.
-
-If Detailed Study Notes:
-Provide introduction, definitions, explanations,
-examples, important concepts and summary.
-
-If Short Revision Notes:
-Provide concise points, definitions and essential facts.
-
-If Mind Map:
-Create a structured visual hierarchy using
-a readable text-based tree.
-
-If Memory Tricks:
-Create meaningful mnemonics, shortcuts and
-easy memorisation techniques.
-
-If Important Topics:
-Identify concepts worth prioritising for revision.
-Do not claim previous-year frequency unless
-actual previous-year papers are provided.
-
-If Exam Preparation Notes:
-Provide exam-oriented explanations,
-important definitions and practice questions.
-
-Use clear Markdown formatting.
-
-Use headings, subheadings, bullet points and tables.
-
-Do not return JSON.
-Do not return code.
-Do not include unrelated information.
-Do not invent examination statistics.
-
-Return only the requested educational content.
+1. Understand the question carefully.
+2. Answer according to the selected subject.
+3. Explain step by step.
+4. Include an example.
+5. Use simple language.
+6. Include a diagram description if useful.
+7. Do not answer an unrelated question as if it belongs
+to the selected subject.
 """
 
-        with st.spinner(
-            "TECHNOVA AI is preparing your learning material..."
-        ):
+            with st.spinner("Solving your doubt..."):
 
-            try:
+                result = generate_ai(prompt, 2500)
 
-                result = ask_ai(prompt)
+            st.markdown(result)
 
-                if not result.strip():
-                    raise ValueError("Empty AI response.")
 
-                st.session_state.generated_notes = result
-                st.session_state.generated_style = note_style
+# ==========================================
+# TAB 3 - EXAM PREPARATION
+# ==========================================
 
-                st.success("Learning material generated!")
+with tab3:
 
-            except Exception as e:
+    st.header("📚 Exam Preparation")
 
-                st.error(
-                    f"Generation failed: {e}"
-                )
-if "generated_notes" in st.session_state:
-
-    content = st.session_state.generated_notes
-
-    st.markdown("---")
-
-    st.markdown("## 📖 Your Learning Material")
-
-    st.markdown(content)
-
-    st.markdown("---")
-
-    st.subheader("📥 Download Your Notes")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-
-        if st.button("✍️ Create Handwritten PDF"):
-
-            try:
-
-                pdf = create_study_pdf(
-                    content,
-                    "Handwritten"
-                )
-
-                st.download_button(
-                    "Download Handwritten Notes",
-                    data=pdf,
-                    file_name="TECHNOVA_Handwritten_Notes.pdf",
-                    mime="application/pdf"
-                )
-
-            except Exception as e:
-
-                st.error(f"PDF error: {e}")
-
-    with col2:
-
-        if st.button("💻 Create Digital PDF"):
-
-            try:
-
-                pdf = create_study_pdf(
-                    content,
-                    "Digital"
-                )
-
-                st.download_button(
-                    "Download Digital Notes",
-                    data=pdf,
-                    file_name="TECHNOVA_Digital_Notes.pdf",
-                    mime="application/pdf"
-                )
-
-            except Exception as e:
-
-                st.error(f"PDF error: {e}")
-
-    st.download_button(
-        "⬇️ Download Markdown Notes",
-        data=content,
-        file_name="TECHNOVA_Notes.md",
-        mime="text/markdown"
+    exam_option = st.selectbox(
+        "Choose Exam Material",
+        [
+            "Important Questions",
+            "2 Mark Questions",
+            "4 Mark Questions",
+            "5 Mark Questions",
+            "6 Mark Questions",
+            "Chapter-wise PYQ-style Questions",
+            "Topic-wise Revision",
+            "Formulas and Definitions"
+        ]
     )
+
+    number_questions = st.slider(
+        "Number of Questions",
+        5,
+        30,
+        10
+    )
+
+    if st.button("Generate Exam Material"):
+
+        if validate_inputs():
+
+            prompt = build_prompt(f"""
+Generate examination preparation material.
+
+Selected option: {exam_option}
+
+Number of questions: {number_questions}
+
+Instructions:
+
+1. Generate questions strictly from the selected topic.
+2. Give accurate answers.
+3. Explain answers according to their marks.
+4. Use suitable examples.
+5. Include diagrams where necessary.
+6. Highlight important keywords.
+7. Keep the answers examination-oriented.
+
+For PYQ-style questions:
+Generate questions similar to previous-year examination
+patterns. Do not falsely claim that AI-generated questions
+are verified actual previous-year questions.
+
+For revision:
+Include important definitions, concepts and key points.
+""")
+
+            with st.spinner("Preparing examination material..."):
+
+                result = generate_ai(prompt, 4500)
+
+            st.session_state.results["exam"] = result
+
+    if "exam" in st.session_state.results:
+
+        st.markdown(st.session_state.results["exam"])
+
+        st.download_button(
+            "⬇️ Download Exam Material",
+            data=st.session_state.results["exam"],
+            file_name="TECHNOVA_Exam_Preparation.txt",
+            mime="text/plain"
+        )
+
+
+# ==========================================
+# TAB 4 - MIND MAPS
+# ==========================================
+
+with tab4:
+
+    st.header("🧠 Visual Learning Centre")
+
+    visual_option = st.selectbox(
+        "Select Visual Learning Tool",
+        [
+            "Mind Map",
+            "Topic Diagram",
+            "Flowchart",
+            "Memory Tricks",
+            "Real-Life Examples"
+        ]
+    )
+
+    if st.button("Generate Visual Learning Material"):
+
+        if validate_inputs():
+
+            prompt = build_prompt(f"""
+Create the following learning material:
+
+{visual_option}
+
+Requirements:
+
+For Mind Maps:
+- Start with the main topic.
+- Create branches and sub-branches.
+- Include important concepts.
+- Use an easy-to-understand tree structure.
+
+For Topic Diagram:
+- Create a clear labelled educational diagram.
+- Explain every component.
+- Use ASCII diagram format where appropriate.
+
+For Flowchart:
+- Use arrows and logical steps.
+- Explain the process step by step.
+
+For Memory Tricks:
+- Create easy mnemonics.
+- Give simple memorization techniques.
+- Explain how to remember important concepts.
+
+For Real-Life Examples:
+- Give relevant practical examples.
+- Connect theory with real-world applications.
+
+Keep everything related to the selected subject and topic.
+""")
+
+            with st.spinner("Creating visual learning material..."):
+
+                result = generate_ai(prompt, 3000)
+
+            st.session_state.results["visual"] = result
+
+    if "visual" in st.session_state.results:
+
+        st.markdown(
+            st.session_state.results["visual"]
+        )
+
+        st.download_button(
+            "⬇️ Download Learning Material",
+            data=st.session_state.results["visual"],
+            file_name="TECHNOVA_Visual_Learning.txt",
+            mime="text/plain"
+        )
+
+
+# ==========================================
+# TAB 5 - MOCK TEST
+# ==========================================
+
+with tab5:
+
+    st.header("🎯 AI Mock Test")
+
+    st.write(
+        "Practice questions and test your knowledge."
+    )
+
+    test_level = st.selectbox(
+        "Select Test Difficulty",
+        [
+            "Easy",
+            "Medium",
+            "Hard"
+        ]
+    )
+
+    test_count = st.selectbox(
+        "Number of Questions",
+        [5, 10, 15, 20]
+    )
+
+    if st.button("Start Mock Test"):
+
+        if validate_inputs():
+
+            prompt = build_prompt(f"""
+Create a mock examination.
+
+Difficulty: {test_level}
+Number of questions: {test_count}
+
+Include:
+
+1. Multiple-choice questions.
+2. Four options for each question.
+3. One correct answer.
+4. Questions strictly from the selected chapter.
+5. A separate answer key at the end.
+
+Do not reveal the correct answer immediately
+after each question.
+
+Use this format:
+
+Q1. Question
+
+A) Option
+B) Option
+C) Option
+D) Option
+
+Continue until all questions are generated.
+
+At the end provide:
+
+ANSWER KEY:
+
+Q1 - B
+Q2 - A
+
+Ensure the answer key is accurate.
+""")
+
+            with st.spinner("Preparing your mock test..."):
+
+                result = generate_ai(prompt, 4000)
+
+            st.session_state.results["mock"] = result
+
+    if "mock" in st.session_state.results:
+
+        st.markdown(st.session_state.results["mock"])
+
+        st.download_button(
+            "⬇️ Download Mock Test",
+            data=st.session_state.results["mock"],
+            file_name="TECHNOVA_Mock_Test.txt",
+            mime="text/plain"
+        )
+
+
+# ==========================================
+# FOOTER
+# ==========================================
+
+st.divider()
+
 st.markdown(
-    "<div style='text-align:center;'>Created by ❤️ Ruchita</div>",
+    """
+    <div style="text-align:center">
+
+    🚀 <b>TECHNOVA AI</b>
+
+    <p>Your Personal AI Learning Companion</p>
+
+    <small>Learn • Practice • Improve • Succeed</small>
+
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+# ==========================================
+# FOOTER
+# ==========================================
+
+st.divider()
+
+st.markdown(
+    """
+    <div style="text-align:center; padding:20px;">
+
+        <h2>🚀 TECHNOVA AI</h2>
+
+        <p>Your Personal AI Learning Companion</p>
+
+        <p>Learn • Practice • Improve • Succeed</p>
+
+        <hr>
+
+        <p style="font-size:16px; color:#f472b6;">
+            ❤️ Built with Love by <b>Ruchita</b>
+        </p>
+
+        <small>© 2026 TECHNOVA AI. All Rights Reserved.</small>
+
+    </div>
+    """,
     unsafe_allow_html=True
 )
