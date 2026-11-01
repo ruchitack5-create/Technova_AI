@@ -103,6 +103,7 @@ def get_client():
 client = get_client()
 
 def ask_ai(prompt, max_tokens=3500, json_mode=False):
+    """Call Gemini and return text with friendly error handling."""
     if client is None:
         return None, "Gemini API key is missing. Add GEMINI_API_KEY in Streamlit Cloud → App settings → Secrets."
     try:
@@ -129,6 +130,7 @@ def ask_ai(prompt, max_tokens=3500, json_mode=False):
         return None, f"Gemini request failed: {message[:500]}"
 
 def parse_json(text):
+    """Parse model JSON even if it accidentally adds code fences."""
     if not text:
         raise ValueError("Empty JSON response")
     cleaned = text.strip()
@@ -182,6 +184,7 @@ def show_download(text, filename):
     )
 
 def svg_flowchart(steps):
+    """Build a clean responsive SVG flowchart from a list of step labels."""
     steps = [str(x)[:90] for x in steps[:8] if str(x).strip()]
     if not steps:
         steps = ["Start", "Understand the input", "Process information", "Produce result", "End"]
@@ -203,6 +206,7 @@ def svg_flowchart(steps):
     return "".join(parts)
 
 def svg_mindmap(center, branches):
+    """Build a simple colourful mind map SVG."""
     branches = branches[:6] if isinstance(branches, list) else []
     width, height = 820, 480
     cx, cy = 410, 240
@@ -229,848 +233,551 @@ def svg_mindmap(center, branches):
     return "".join(parts)
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def search_wikimedia_images(search_term, limit=4):
-    query = urllib.parse.urlencode({
-        "action": "query",
-        "generator": "search",
-        "gsrsearch": f"filetype:bitmap {search_term}",
-        "gsrnamespace": 6,
-        "gsrlimit": limit,
-        "prop": "imageinfo",
-        "iiprop": "url",
-        "iiurlwidth": 600,
-        "format": "json"
-    })
-    url = "https://commons.wikimedia.org/w/api.php?" + query
-    request = urllib.request.Request(
-        url,
-        headers={"User-Agent": "TECHNOVA-AI-Educational-App/1.0 (student project)"}
-    )
-    with urllib.request.urlopen(request, timeout=12) as response:
-        data = json.loads(response.read().decode("utf-8"))
-    pages = data.get("query", {}).get("pages", {})
-    results = []
-    for page in pages.values():
-        info = (page.get("imageinfo") or [{}])[0]
-        image_url = info.get("thumburl") or info.get("url")
-        if image_url:
-            results.append({
-                "title": page.get("title", "Educational image").replace("File:", ""),
-                "url": image_url,
-                "source": info.get("descriptionurl", "https://commons.wikimedia.org/")
-            })
-    return results
-# =========================================================
-# COURSE CATALOGUE
-# =========================================================
-
-COURSES = {
-    "School (Classes 6–10)": [
-        "Class 6", "Class 7", "Class 8", "Class 9", "Class 10",
-        "CBSE", "ICSE", "Karnataka State Board", "Other State Board"
-    ],
-    "PUC / Intermediate": [
-        "1st PUC PCMB", "1st PUC PCMC", "1st PUC Commerce",
-        "1st PUC Arts", "2nd PUC PCMB", "2nd PUC PCMC",
-        "2nd PUC Commerce", "2nd PUC Arts"
-    ],
-    "Entrance Examinations": [
-        "JEE Main", "JEE Advanced", "NEET UG", "KCET",
-        "COMEDK", "CUET", "CLAT", "NATA", "NIFT",
-        "BITSAT", "AIMS", "Other Entrance Exam"
-    ],
-    "Degree Courses": [
-        "BA", "BSc", "BCom", "BBA", "BCA", "BEd",
-        "BSW", "BPharm", "BPT", "LLB", "BArch",
-        "BVSc", "BDes", "Other Degree"
-    ],
-    "Postgraduate Courses": [
-        "MA", "MSc", "MCom", "MBA", "MCA", "MEd",
-        "MTech", "MPharm", "LLM", "MSW", "PhD",
-        "Other Postgraduate Course"
-    ],
-    "Engineering": [
-        "BE", "BTech", "Diploma Engineering",
-        "MTech", "ME", "Other Engineering Course"
-    ],
-    "Medical": [
-        "MBBS", "BDS", "BAMS", "BHMS", "BUMS",
-        "BSMS", "MD", "MS", "DM", "MCh"
-    ],
-    "Nursing": [
-        "ANM", "GNM", "BSc Nursing",
-        "Post Basic BSc Nursing", "MSc Nursing",
-        "Nurse Practitioner", "Other Nursing Course"
-    ],
-    "UPSC and Civil Services": [
-        "UPSC Civil Services", "IAS Preparation",
-        "IPS Preparation", "IFS Preparation",
-        "KPSC KAS", "CAPF", "Indian Forest Service"
-    ],
-    "Other Competitive Exams": [
-        "SSC CGL", "SSC CHSL", "SSC MTS",
-        "IBPS PO", "IBPS Clerk", "SBI PO", "SBI Clerk",
-        "RRB NTPC", "RRB Group D", "NDA", "CDS",
-        "AFCAT", "GATE", "CAT", "MAT", "CMAT",
-        "UGC NET", "KSET", "CTET", "TET",
-        "Other Competitive Exam"
+def search_wikimedia_images(subject_name, topic_name, style="Textbook-style labelled diagram", limit=6):
+    """Search Commons for topic-specific diagrams; these are NOT claimed to be NCERT originals."""
+    search_phrases = [
+        f'"{topic_name}" "{subject_name}" labelled diagram',
+        f'"{topic_name}" "{subject_name}" textbook illustration',
+        f'{topic_name} {subject_name} educational scientific diagram'
     ]
-}
+    if "anatomy" in style.lower() or "biology" in style.lower():
+        search_phrases.insert(0, f'{topic_name} {subject_name} anatomy biology labelled illustration')
+    elif "schematic" in style.lower() or "physics" in style.lower():
+        search_phrases.insert(0, f'{topic_name} {subject_name} schematic physics diagram')
+    elif "chemistry" in style.lower():
+        search_phrases.insert(0, f'{topic_name} {subject_name} chemistry structure diagram')
 
-ENGINEERING_BRANCHES = [
-    "Computer Science Engineering",
-    "Artificial Intelligence and Machine Learning",
-    "Artificial Intelligence and Data Science",
-    "Information Science",
-    "Information Technology",
-    "Electronics and Communication",
-    "Electrical and Electronics",
-    "Mechanical Engineering",
-    "Civil Engineering",
-    "Biotechnology",
-    "Chemical Engineering",
-    "Automobile Engineering",
-    "Other Branch"
-]
-
-MEDICAL_SPECIALISATIONS = [
-    "General Medicine", "Cardiology", "Neurology",
-    "Dermatology", "Paediatrics", "Orthopaedics",
-    "Gynaecology", "Oncology", "Radiology",
-    "Anaesthesiology", "Psychiatry", "Surgery",
-    "Other Specialisation"
-]
-
-NURSING_SPECIALISATIONS = [
-    "Medical Surgical Nursing", "Community Health Nursing",
-    "Child Health Nursing", "Mental Health Nursing",
-    "Obstetrics and Gynaecological Nursing",
-    "Critical Care Nursing", "Cardiac Nursing",
-    "Oncology Nursing", "Other Specialisation"
-]
-
-GENERAL_BRANCHES = [
-    "General", "Computer Science", "Mathematics",
-    "Physics", "Chemistry", "Biology", "Commerce",
-    "Economics", "English", "History", "Political Science",
-    "Psychology", "Sociology", "Other"
-]
-
-def choose_item(label, options, key):
-    selected = st.selectbox(label, options, key=key)
-    if selected.startswith("Other"):
-        return st.text_input(
-            f"Enter your {label.lower()}",
-            key=key + "_custom"
+    results, seen = [], set()
+    for phrase in search_phrases:
+        query = urllib.parse.urlencode({
+            "action": "query",
+            "generator": "search",
+            "gsrsearch": f"filetype:bitmap {phrase}",
+            "gsrnamespace": 6,
+            "gsrlimit": limit,
+            "prop": "imageinfo",
+            "iiprop": "url|extmetadata",
+            "iiurlwidth": 700,
+            "format": "json"
+        })
+        url = "https://commons.wikimedia.org/w/api.php?" + query
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "TECHNOVA-AI-Educational-App/1.1 (educational reference search)"}
         )
-    return selected
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except Exception:
+            continue
 
-# =========================================================
-# HEADER
-# =========================================================
+        pages = data.get("query", {}).get("pages", {})
+        for page in pages.values():
+            title = page.get("title", "Educational image").replace("File:", "")
+            title_key = title.casefold()
+            if title_key in seen:
+                continue
+            info = (page.get("imageinfo") or [{}])[0]
+            image_url = info.get("thumburl") or info.get("url")
+            if image_url:
+                seen.add(title_key)
+                results.append({
+                    "title": title,
+                    "url": image_url,
+                    "source": info.get("descriptionurl", "https://commons.wikimedia.org/"),
+                    "license": info.get("extmetadata", {}).get("LicenseShortName", {}).get("value", "Check source page"),
+                    "caption": "Community-hosted reference image — verify labels and source before study use."
+                })
+            if len(results) >= limit:
+                return results[:limit]
+    return results[:limit]
+
+# ------------------------- HEADER -------------------------
 
 st.markdown("""
 <div class="hero">
-    <h1>🚀 TECHNOVA AI</h1>
-    <p>Your Personal AI Learning Companion</p>
-    <p>Learn smarter • Visualise better • Achieve more</p>
+  <h1>🚀 TECHNOVA AI</h1>
+  <p>Your colourful AI learning companion — understand, visualise, practise and succeed.</p>
 </div>
 """, unsafe_allow_html=True)
 
-# =========================================================
-# SIDEBAR: STUDENT AND COURSE SELECTION
-# =========================================================
+# ------------------------- LEARNING INPUTS -------------------------
 
-st.sidebar.title("🎓 Learning Setup")
-
-category = st.sidebar.selectbox(
-    "Select Course Category",
-    list(COURSES.keys())
-)
-
-course = choose_item(
-    "Select Course / Examination",
-    COURSES[category],
-    "course_select"
-)
-
-if category == "Engineering":
-    specialisation = choose_item(
-        "Select Engineering Branch",
-        ENGINEERING_BRANCHES,
-        "engineering_branch"
-    )
-elif category == "Medical":
-    specialisation = choose_item(
-        "Select Medical Specialisation",
-        MEDICAL_SPECIALISATIONS,
-        "medical_branch"
-    )
-elif category == "Nursing":
-    specialisation = choose_item(
-        "Select Nursing Specialisation",
-        NURSING_SPECIALISATIONS,
-        "nursing_branch"
-    )
-elif category in ["School (Classes 6–10)", "PUC / Intermediate"]:
-    specialisation = st.sidebar.text_input(
-        "Stream / Board (optional)",
-        placeholder="Example: PCMB, CBSE"
-    )
-else:
-    specialisation = choose_item(
-        "Select Branch / Specialisation",
-        GENERAL_BRANCHES,
-        "general_branch"
-    )
-
-if category in [
-    "School (Classes 6–10)",
-    "PUC / Intermediate",
-    "Engineering",
-    "Degree Courses",
-    "Postgraduate Courses",
-    "Medical",
-    "Nursing"
-]:
-    level = st.sidebar.selectbox(
-        "Year / Class / Semester",
-        [
-            "Class 6", "Class 7", "Class 8", "Class 9", "Class 10",
-            "1st PUC", "2nd PUC",
-            "1st Year", "2nd Year", "3rd Year", "4th Year",
-            "1st Semester", "2nd Semester",
-            "3rd Semester", "4th Semester",
-            "5th Semester", "6th Semester",
-            "7th Semester", "8th Semester",
-            "Final Year", "Other"
-        ]
-    )
-else:
-    level = st.sidebar.selectbox(
-        "Preparation Level",
-        ["Beginner", "Intermediate", "Advanced", "Exam Revision"]
-    )
-
-if level == "Other":
-    level = st.sidebar.text_input("Enter your year / semester")
-
-subject = st.sidebar.text_input(
-    "📚 Enter Subject",
-    placeholder="Example: Java, Biology, Physics"
-)
-
-topic = st.sidebar.text_input(
-    "📝 Enter Topic / Chapter",
-    placeholder="Example: OOP Concepts"
-)
-
-language = st.sidebar.selectbox(
-    "🌐 Learning Language",
-    ["English", "Kannada", "Hindi"]
-)
-
-detail_level = st.sidebar.selectbox(
-    "Explanation Style",
-    ["Simple and Easy", "Detailed", "Exam Oriented", "Advanced"]
-)
-
-st.sidebar.divider()
-
-if st.sidebar.button("🔄 Reset Current Topic"):
-    st.session_state.pop("generated_notes", None)
-    st.session_state.pop("generated_notes_raw", None)
-    st.rerun()
-
-# =========================================================
-# VALIDATE INPUT
-# =========================================================
-
-if not subject.strip():
-    st.info("👈 Select your course and enter a subject to get started.")
-    st.stop()
-
-if not topic.strip():
-    st.info("👈 Enter a topic or chapter to start learning.")
-    st.stop()
-
-# =========================================================
-# PREVIOUS TOPICS HISTORY
-# =========================================================
-
-if "topic_history" not in st.session_state:
-    st.session_state.topic_history = []
-
-current_topic = {
-    "category": category,
-    "course": course,
-    "specialisation": specialisation,
-    "level": level,
-    "subject": subject,
-    "topic": topic
+COURSE_OPTIONS = {
+    "School (Classes 6–10)": {
+        "courses": ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10"],
+        "specialisations": ["General curriculum", "CBSE", "ICSE", "State Board", "Other board"]
+    },
+    "PU / Higher Secondary": {
+        "courses": ["1st PUC / Class 11", "2nd PUC / Class 12"],
+        "specialisations": ["Science (PCMB)", "Science (PCMC)", "Commerce", "Arts / Humanities", "JEE Main", "JEE Advanced", "NEET UG", "KCET", "COMEDK", "CUET UG", "Other entrance exam"]
+    },
+    "Degree – Undergraduate": {
+        "courses": ["BA", "BSc", "BCom", "BBA", "BCA", "BSW", "BEd", "BPEd", "BE / BTech", "BArch", "BDes", "BFA", "BHM", "BPharm", "PharmD", "BPT", "BOT", "LLB", "BVoc", "Other undergraduate degree"],
+        "specialisations": ["General", "Computer Science", "Artificial Intelligence / AIML", "Mathematics", "Physics", "Chemistry", "Biology", "Botany", "Zoology", "Statistics", "Economics", "English", "Kannada", "History", "Political Science", "Psychology", "Sociology", "Commerce", "Accounting and Finance", "Education", "Law", "Architecture", "Design", "Hospitality", "Pharmacy", "Physiotherapy", "Other"]
+    },
+    "Degree – Postgraduate & Research": {
+        "courses": ["MA", "MSc", "MCom", "MBA", "MCA", "MEd", "MTech", "ME", "MSW", "LLM", "MPharm", "MPH", "PhD", "Other postgraduate / research course"],
+        "specialisations": ["Computer Science", "Artificial Intelligence / AIML", "Data Science", "Mathematics", "Physics", "Chemistry", "Biology", "Commerce", "Finance", "Economics", "English", "History", "Political Science", "Psychology", "Education", "Social Work", "Law", "Engineering", "Pharmacy", "Public Health", "Other"]
+    },
+    "Engineering & Polytechnic": {
+        "courses": ["Diploma", "BE", "BTech", "ME", "MTech", "Other engineering course"],
+        "specialisations": ["AIML", "Computer Science", "Information Science", "Data Science", "Electronics and Communication", "Electrical and Electronics", "Electrical Engineering", "Mechanical", "Civil", "Chemical", "Automobile", "Biotechnology", "Other branch"]
+    },
+    "Medical & AYUSH": {
+        "courses": ["MBBS", "BDS", "BAMS", "BHMS", "BUMS", "BSMS", "BNYS", "BVSc & AH", "MD", "MS", "MDS", "Other medical / AYUSH course"],
+        "specialisations": ["Anatomy", "Physiology", "Biochemistry", "Pathology", "Pharmacology", "Microbiology", "Forensic Medicine", "Community Medicine", "General Medicine", "General Surgery", "Cardiology", "Neurology", "Dermatology", "Orthopaedics", "Radiology", "Psychiatry", "Obstetrics and Gynaecology", "Paediatrics", "Ophthalmology", "ENT", "Anaesthesiology", "Other"]
+    },
+    "Nursing & Allied Health": {
+        "courses": ["BSc Nursing", "GNM", "ANM", "Post Basic BSc Nursing", "MSc Nursing", "BPT", "BOT", "BMLT", "BSc Radiology / Imaging", "BSc Operation Theatre Technology", "BSc Anaesthesia Technology", "BSc Medical Lab Technology", "Other allied health course"],
+        "specialisations": ["Nursing Foundation", "Medical-Surgical Nursing", "Cardiac / Cardiovascular Nursing", "Critical Care Nursing", "Emergency Nursing", "Paediatric Nursing", "Psychiatric / Mental Health Nursing", "Community Health Nursing", "Obstetric and Gynaecological Nursing", "Oncology Nursing", "Neonatal Nursing", "Orthopaedic Nursing", "Anatomy and Physiology", "Nutrition", "Pharmacology", "Other"]
+    },
+    "UPSC & State Civil Services": {
+        "courses": ["UPSC Civil Services (CSE)", "KPSC KAS", "UPSC CAPF", "Indian Forest Service (IFoS)", "Other civil service exam"],
+        "specialisations": ["General Studies", "CSAT", "History", "Geography", "Indian Polity", "Economy", "Environment and Ecology", "Science and Technology", "Ethics", "Current Affairs", "Essay", "Optional subject", "Other"]
+    },
+    "Other Competitive & Entrance Exams": {
+        "courses": ["SSC CGL", "SSC CHSL", "SSC MTS", "Banking (IBPS / SBI)", "Railway (RRB)", "Defence (NDA / CDS / AFCAT)", "GATE", "CAT", "MAT", "XAT", "UGC NET", "KSET", "CTET", "State TET", "CLAT", "AILET", "NATA", "CUET PG", "NEET PG", "INI-CET", "Other competitive exam"],
+        "specialisations": ["Quantitative Aptitude", "Logical Reasoning", "Verbal Ability", "English", "General Awareness", "General Studies", "General Science", "Computer Knowledge", "Current Affairs", "Subject-specific preparation", "Other"]
+    }
 }
 
-if current_topic not in st.session_state.topic_history:
-    st.session_state.topic_history.insert(0, current_topic)
+SUBJECTS_BY_AREA = {
+    "School (Classes 6–10)": ["Mathematics", "Science", "Social Science", "English", "Kannada", "Hindi", "Computer Science", "Other"],
+    "PU / Higher Secondary": ["Physics", "Chemistry", "Mathematics", "Biology", "Computer Science", "Accountancy", "Business Studies", "Economics", "English", "Other"],
+    "Degree – Undergraduate": ["English", "Kannada", "History", "Political Science", "Economics", "Psychology", "Sociology", "Education", "Mathematics", "Physics", "Chemistry", "Botany", "Zoology", "Statistics", "Computer Science", "Commerce", "Accounting", "Law", "Architecture", "Design", "Pharmacy", "Physiotherapy", "Other"],
+    "Degree – Postgraduate & Research": ["English", "History", "Political Science", "Economics", "Psychology", "Education", "Mathematics", "Physics", "Chemistry", "Biology", "Computer Science", "Data Science", "Commerce", "Finance", "Law", "Engineering", "Pharmacy", "Public Health", "Research Methodology", "Other"],
+    "Engineering & Polytechnic": ["Engineering Mathematics", "Applied Physics", "Applied Chemistry", "Programming", "Artificial Intelligence", "Machine Learning", "Data Structures and Algorithms", "Python Programming", "Java Programming", "C Programming", "Database Management", "Operating Systems", "Computer Networks", "Electronics", "Electrical Engineering", "Mechanical Engineering", "Civil Engineering", "Other"],
+    "Medical & AYUSH": ["Anatomy", "Physiology", "Biochemistry", "Pathology", "Pharmacology", "Microbiology", "Forensic Medicine", "Community Medicine", "General Medicine", "Surgery", "Obstetrics and Gynaecology", "Paediatrics", "Other"],
+    "Nursing & Allied Health": ["Nursing Foundation", "Anatomy and Physiology", "Nutrition", "Medical-Surgical Nursing", "Child Health Nursing", "Mental Health Nursing", "Community Health Nursing", "Midwifery", "Pharmacology", "Critical Care", "Cardiovascular Nursing", "Other"],
+    "UPSC & State Civil Services": ["General Studies", "CSAT", "History", "Geography", "Polity", "Economy", "Environment", "Science and Technology", "Ethics", "Current Affairs", "Essay", "Optional Subject", "Other"],
+    "Other Competitive & Entrance Exams": ["Quantitative Aptitude", "Reasoning", "English", "General Awareness", "General Science", "Computer Knowledge", "Current Affairs", "Exam-specific subject", "Other"]
+}
 
-st.session_state.topic_history = (
-    st.session_state.topic_history[:30]
-)
+with st.sidebar:
+    st.header("📚 Learning setup")
+    level = st.selectbox("Choose your course category", list(COURSE_OPTIONS.keys()))
+    course_choice = st.selectbox("Choose course / programme / exam", COURSE_OPTIONS[level]["courses"])
+    course = st.text_input("Enter your course or exam name", "") if course_choice.startswith("Other") else course_choice
+    specialisation_choice = st.selectbox("Stream / branch / specialisation", COURSE_OPTIONS[level]["specialisations"])
+    specialisation = st.text_input("Enter your specialisation", "") if specialisation_choice == "Other" else specialisation_choice
+    subject_choices = SUBJECTS_BY_AREA[level]
+    subject_choice = st.selectbox("Choose subject", subject_choices)
+    subject = st.text_input("Enter your subject", "") if subject_choice == "Other" else subject_choice
+    topic = st.text_input("Chapter / topic", placeholder="e.g. Human heart, Indian Constitution, Intelligent Agents")
+    language = st.selectbox("Language", ["Simple English", "Kannada", "Hindi"])
+    detail_level = st.selectbox("Content depth", ["Short", "Medium", "Detailed"], index=1)
+    st.markdown("---")
+    st.caption("Choose your course, programme, stream and subject. You can enter any chapter or topic.")
 
-# =========================================================
-# DASHBOARD TABS
-# =========================================================
+ready = bool(subject and subject.strip() and topic and topic.strip())
 
-tabs = st.tabs([
-    "📒 Smart Notes",
-    "🧠 Mind Maps",
-    "🔀 Flowcharts",
-    "🖼️ Topic Images",
-    "📝 Exam Preparation",
-    "🎯 Mock Tests",
+if not ready:
+    st.info("👈 Choose your course and subject, then enter a chapter/topic in the sidebar to begin.")
+else:
+    st.success(f"Ready to learn: **{course} · {specialisation} · {subject} → {topic}**")
+
+# ------------------------- MAIN TABS -------------------------
+
+tab_notes, tab_visual, tab_exam, tab_textbook, tab_quiz, tab_doubt, tab_history = st.tabs([
+    "📝 Colourful Notes",
+    "🎨 Visual Learning",
+    "📖 Exam Preparation",
+    "📘 Textbook & PYQs",
+    "🎯 Mock Test",
     "💬 Doubt Solver",
-    "📚 Previous Topics"
+    "🕘 Previous Topics"
 ])
 
-# =========================================================
-# TAB 1: SMART NOTES
-# =========================================================
+def save_topic_history(activity):
+    entry = {
+        "course": course,
+        "specialisation": specialisation,
+        "subject": subject,
+        "topic": topic,
+        "activity": activity
+    }
+    history = st.session_state.get("topic_history", [])
+    # Keep the newest matching activity at the top and avoid consecutive duplicates.
+    if not history or history[0] != entry:
+        history.insert(0, entry)
+    st.session_state["topic_history"] = history[:40]
 
-with tabs[0]:
-    st.header("📒 Colourful Digital Notes")
+# ========================= NOTES ============================
 
-    st.write(
-        f"**{subject} → {topic}**"
-    )
-
-    if st.button("✨ Generate Smart Notes", key="notes_btn"):
-        prompt = common_context("""
-Create colourful, well-organised educational notes.
-
-Include:
-1. Topic introduction.
-2. Important definitions.
-3. Main concepts with headings.
-4. Step-by-step explanations.
-5. Important points.
-6. Relevant examples from the selected subject.
-7. Diagrams described using text where useful.
-8. Important formulas ONLY if relevant.
-9. Exam tips.
-10. Quick revision summary.
-11. Five important questions with answers.
-
-Use Markdown headings, bullets, numbered steps and tables.
-Use simple explanations and avoid unrelated content.
+with tab_notes:
+    st.subheader("📝 Digital handwritten-style notes")
+    st.write("Notebook-inspired pages with coloured definitions, key points, examples and exam tips.")
+    if st.button("✨ Create my notes", key="make_notes", disabled=not ready):
+        prompt = common_context(f"""
+Create {detail_level.lower()} study notes in a visually organised structure.
+Use Markdown headings and these exact labels where relevant:
+## 🌸 Introduction
+## 🔵 Definition
+## 🟣 Main concepts
+## 🟢 Step-by-step explanation
+## 🧡 Important points
+## 📌 Formulae / key terms (only if relevant)
+## 🌍 Real-life examples
+## ⭐ Exam tip
+## 📝 Quick revision
+Keep paragraphs short. Use bullet points and simple examples.
+Do not include sections that genuinely do not apply to this topic.
 """)
-
-        with st.spinner("Preparing your digital notebook..."):
-            answer, error = ask_ai(prompt, max_tokens=4500)
-
+        with st.spinner("Writing and decorating your digital notes..."):
+            answer, error = ask_ai(prompt, 4500)
         if error:
             show_error(error)
         else:
-            st.session_state.generated_notes_raw = answer
-            st.session_state.generated_notes = answer
+            st.session_state["notes"] = answer
+            save_topic_history("Colourful notes")
 
-    if st.session_state.get("generated_notes"):
-        st.markdown(
-            f'<div class="note-paper">{st.session_state.generated_notes}</div>',
-            unsafe_allow_html=True
-        )
-        show_download(
-            st.session_state.generated_notes,
-            "TECHNOVA_AI_Notes.txt"
-        )
+    if st.session_state.get("notes"):
+        st.markdown('<div class="note-paper">', unsafe_allow_html=True)
+        st.markdown(st.session_state["notes"])
+        st.markdown("</div>", unsafe_allow_html=True)
+        show_download(st.session_state["notes"], "TECHNOVA_AI_Colourful_Notes.md")
 
-# =========================================================
-# TAB 2: MIND MAP
-# =========================================================
+# ========================= VISUAL LEARNING ==================
 
-with tabs[1]:
-    st.header("🧠 Visual Mind Map")
-
-    if st.button("Generate Colourful Mind Map", key="mind_btn"):
-        prompt = common_context("""
-Create a mind map for this topic.
-Return ONLY valid JSON in this format:
-{
-  "center": "Main topic",
-  "branches": [
-    {"title": "Branch 1", "points": ["Point 1", "Point 2"]},
-    {"title": "Branch 2", "points": ["Point 1", "Point 2"]}
-  ]
-}
-Use 4 to 6 important branches.
-Keep each point short and accurate.
+with tab_visual:
+    st.subheader("🎨 Pictorial learning studio")
+    st.write("Generate graphical flowcharts and mind maps, then find topic-related reference images.")
+    v1, v2 = st.columns(2)
+    with v1:
+        if st.button("🔀 Generate pictorial flowchart", key="flow", disabled=not ready):
+            prompt = common_context("""
+Return ONLY valid JSON with this structure:
+{"title":"short title","steps":["step 1","step 2","step 3","step 4","step 5"],"explanation":"brief explanation"}
+Create 4 to 8 logical steps in correct order. Each step must be short enough to fit inside a flowchart box. Keep it specific to the topic.
 """)
-
-        with st.spinner("Creating your mind map..."):
-            answer, error = ask_ai(
-                prompt,
-                max_tokens=1800,
-                json_mode=True
-            )
-
-        if error:
-            show_error(error)
-        else:
-            try:
-                data = parse_json(answer)
-                st.session_state.mindmap_data = data
-            except Exception:
-                show_error("Mind map format was incorrect. Please try again.")
-
-    if st.session_state.get("mindmap_data"):
-        data = st.session_state.mindmap_data
-        st.markdown(
-            svg_mindmap(
-                data.get("center", topic),
-                data.get("branches", [])
-            ),
-            unsafe_allow_html=True
-        )
-
-# =========================================================
-# TAB 3: FLOWCHART
-# =========================================================
-
-with tabs[2]:
-    st.header("🔀 Pictorial Flowchart")
-
-    if st.button("Generate Flowchart", key="flow_btn"):
-        prompt = common_context("""
-Create a clear flowchart for this topic.
-Return ONLY valid JSON:
-{
-  "title": "Flowchart title",
-  "steps": [
-    "Step 1",
-    "Step 2",
-    "Step 3",
-    "Step 4",
-    "Step 5"
-  ]
-}
-Give 4 to 8 short steps in the correct order.
-For a process, show its actual sequence.
-For a theory topic, show the logical learning structure.
+            with st.spinner("Drawing your flowchart..."):
+                answer, error = ask_ai(prompt, 1600, json_mode=True)
+            if error:
+                show_error(error)
+            else:
+                try:
+                    st.session_state["flow_data"] = parse_json(answer)
+                    save_topic_history("Pictorial flowchart")
+                except Exception:
+                    st.error("The flowchart data was not in a readable format. Please try again.")
+    with v2:
+        if st.button("🌳 Generate colourful mind map", key="mind", disabled=not ready):
+            prompt = common_context("""
+Return ONLY valid JSON with this structure:
+{"center":"main topic","branches":[{"title":"branch name","points":["point 1","point 2"]}]}
+Create 4 to 6 branches. Each branch should have 1 to 3 short related points. Keep all branches relevant to the chosen topic.
 """)
-
-        with st.spinner("Drawing your flowchart..."):
-            answer, error = ask_ai(
-                prompt,
-                max_tokens=1400,
-                json_mode=True
-            )
-
-        if error:
-            show_error(error)
-        else:
-            try:
-                st.session_state.flow_data = parse_json(answer)
-            except Exception:
-                show_error("Flowchart format was incorrect. Please try again.")
+            with st.spinner("Building your mind map..."):
+                answer, error = ask_ai(prompt, 1800, json_mode=True)
+            if error:
+                show_error(error)
+            else:
+                try:
+                    st.session_state["mind_data"] = parse_json(answer)
+                    save_topic_history("Colourful mind map")
+                except Exception:
+                    st.error("The mind map data was not in a readable format. Please try again.")
 
     if st.session_state.get("flow_data"):
-        data = st.session_state.flow_data
-        st.subheader(data.get("title", topic))
-        st.markdown(
-            svg_flowchart(data.get("steps", [])),
-            unsafe_allow_html=True
-        )
+        data = st.session_state["flow_data"]
+        st.markdown(f"### 🔀 {html.escape(str(data.get('title', 'Topic flowchart')))}")
+        st.markdown(svg_flowchart(data.get("steps", [])), unsafe_allow_html=True)
+        if data.get("explanation"):
+            st.info(data["explanation"])
 
-# =========================================================
-# TAB 4: RELEVANT TOPIC IMAGES
-# =========================================================
+    if st.session_state.get("mind_data"):
+        data = st.session_state["mind_data"]
+        st.markdown(f"### 🌳 {html.escape(str(data.get('center', topic)))}")
+        st.markdown(svg_mindmap(data.get("center", topic), data.get("branches", [])), unsafe_allow_html=True)
+        with st.expander("Read mind-map branch details"):
+            for branch in data.get("branches", []):
+                if isinstance(branch, dict):
+                    st.markdown(f"**{branch.get('title', 'Branch')}**")
+                    for point in branch.get("points", []):
+                        st.write("•", point)
 
-with tabs[3]:
-    st.header("🖼️ Topic-Related Educational Images")
-
-    if st.button("Find Relevant Images", key="images_btn"):
-        search_term = f"{subject} {topic} educational diagram"
-        with st.spinner("Searching educational images..."):
-            try:
-                st.session_state.topic_images = search_wikimedia_images(
-                    search_term
-                )
-            except Exception as exc:
-                st.session_state.topic_images = []
-                st.warning(f"Image search failed: {str(exc)[:200]}")
-
+    st.divider()
+    st.markdown("### 🖼️ Textbook-style topic diagrams and illustrations")
+    st.caption("TECHNOVA searches public educational reference images and prioritises labelled, topic-specific diagrams. These results are not automatically official NCERT images.")
+    image_style = st.selectbox(
+        "Choose diagram style",
+        ["Textbook-style labelled diagram", "Biology / anatomy illustration", "Chemistry structure diagram", "Physics schematic / ray diagram", "General educational illustration"],
+        key="image_style"
+    )
+    if st.button("Find relevant textbook-style images", key="images", disabled=not ready):
+        try:
+            with st.spinner("Searching for labelled diagrams related to your exact topic..."):
+                st.session_state["topic_images"] = search_wikimedia_images(subject, topic, image_style, 6)
+                save_topic_history("Topic reference images")
+        except Exception as exc:
+            st.session_state["topic_images"] = []
+            st.warning(f"Image search is temporarily unavailable: {str(exc)[:220]}")
     images = st.session_state.get("topic_images", [])
-
     if images:
         cols = st.columns(2)
         for index, item in enumerate(images):
             with cols[index % 2]:
                 st.image(item["url"], use_container_width=True)
                 st.caption(item["title"])
-                st.markdown(
-                    f"[View original source]({item['source']})"
-                )
-    else:
-        st.info(
-            "Generate images to see relevant educational pictures. "
-            "Image availability depends on Wikimedia Commons."
-        )
-# =========================================================
-# TAB 5: EXAM PREPARATION
-# =========================================================
+                st.caption(f"Licence: {item.get('license', 'Check source page')}")
+                st.markdown(f"[Open image source and verify details]({item['source']})")
+    elif "topic_images" in st.session_state:
+        st.info("No close matches were found. Try a more specific topic name or another diagram style.")
 
-with tabs[4]:
-    st.header("📝 Exam Preparation Centre")
+    st.info("For exam revision, compare every diagram with your prescribed textbook. Image labels and licences must be checked on the original source page.")
 
+    st.markdown("### 🧩 Need a custom labelled explanation?")
+    st.caption("Use the Doubt Solver to request a step-by-step explanation of a specific diagram, its labels and how to remember them.")
+
+# ========================= EXAM PREPARATION =================
+
+with tab_exam:
+    st.subheader("📖 Exam preparation")
     exam_type = st.selectbox(
-        "Choose what you want to prepare",
+        "Choose material",
         [
-            "2 Marks Questions",
-            "4 Marks Questions",
-            "5 Marks Questions",
-            "6 Marks Questions",
-            "Important Questions",
-            "PYQ-Style Practice Questions",
-            "Definitions",
-            "Formulas and Key Concepts",
-            "Quick Revision",
-            "Memory Tricks",
-            "Real-World Examples"
+            "Important questions with answers",
+            "2-mark questions with answers",
+            "4-mark questions with answers",
+            "5-mark questions with answers",
+            "6-mark questions with answers",
+            "Chapter-wise PYQ-style practice questions",
+            "Definitions and formulae",
+            "Topic-wise quick revision",
+            "Memory tricks and mnemonics",
+            "Real-world examples"
         ],
         key="exam_type"
     )
-
-    if st.button("Generate Exam Material", key="exam_btn"):
+    count = st.slider("Number of questions / points", 5, 20, 10)
+    if st.button("📚 Generate exam material", key="exam_generate", disabled=not ready):
         prompt = common_context(f"""
-Generate material for: {exam_type}.
-
-Requirements:
-- Stay strictly relevant to the selected subject and topic.
-- Give accurate, exam-oriented answers.
-- Include examples wherever useful.
-- Use clear headings and numbered points.
-- For numerical topics, include suitable solved examples.
-- For theory topics, explain concepts with relevant examples.
-- Do not generate irrelevant formulas.
-- Do not claim generated practice questions are verified official PYQs.
-
-If PYQ-style practice is selected, create questions similar in style
-to examination questions and clearly label them as practice questions.
+Create: {exam_type}
+Number requested: {count}
+For mark-based answers, make the answer depth appropriate to the marks.
+Use headings, numbered points and a relevant example where appropriate.
+For chapter-wise PYQ-style practice, create topic-specific questions resembling the selected exam pattern. Clearly label them as AI-generated practice questions, NOT verified previous-year questions. Never invent a year, paper code, shift or official source.
+For formulae, only include formulas genuinely relevant to this topic and define every symbol.
+For memory tricks, give a mnemonic and explain what each part represents.
 """)
-
         with st.spinner("Preparing your exam material..."):
-            answer, error = ask_ai(prompt, max_tokens=3500)
-
+            answer, error = ask_ai(prompt, 4500)
         if error:
             show_error(error)
         else:
-            st.session_state.exam_material = answer
-
+            st.session_state["exam_material"] = answer
+            save_topic_history(exam_type)
     if st.session_state.get("exam_material"):
-        st.markdown(
-            f'<div class="note-paper">{st.session_state.exam_material}</div>',
-            unsafe_allow_html=True
-        )
-        show_download(
-            st.session_state.exam_material,
-            "TECHNOVA_Exam_Preparation.txt"
-        )
+        st.markdown(st.session_state["exam_material"])
+        show_download(st.session_state["exam_material"], "TECHNOVA_AI_Exam_Preparation.md")
 
+# ========================= TEXTBOOK & OFFICIAL PYQ HUB ======
 
-# =========================================================
-# TAB 6: INTERACTIVE MOCK TEST
-# =========================================================
+with tab_textbook:
+    st.subheader("📘 Textbook and official question-paper hub")
+    st.write("Open trusted textbook and examination portals. TECHNOVA links to official sources instead of copying copyrighted textbook pages into the app.")
 
-with tabs[5]:
-    st.header("🎯 Interactive Mock Test")
+    st.markdown("#### 📚 NCERT textbooks")
+    st.markdown("- [Open NCERT online textbooks](https://ncert.nic.in/textbook.php)")
+    st.markdown("- [Open ePathshala digital textbooks and learning resources](https://epathshala.nic.in/)")
+    st.caption("Choose the correct class, subject, language and current textbook edition on the official portal. Chapter names and page numbers can change between editions.")
 
-    number_of_questions = st.selectbox(
-        "Number of questions",
-        [5, 10, 15, 20],
-        key="quiz_count"
-    )
+    st.markdown("#### 📝 Official previous-year question-paper portals")
+    exam_name = f"{course} {specialisation}".lower()
+    if "neet" in exam_name:
+        st.markdown("- [NEET official NTA website](https://neet.nta.nic.in/)")
+        st.markdown("- [NEET NTA archive](https://neet.nta.nic.in/archive/)")
+    elif "jee" in exam_name:
+        st.markdown("- [JEE Main official NTA website and question papers](https://jeemain.nta.nic.in/)")
+    elif "upsc" in exam_name or "civil services" in exam_name or "kpsc" in exam_name:
+        st.markdown("- [UPSC official previous question papers](https://upsc.gov.in/examinations/previous-question-papers)")
+        st.markdown("- [UPSC question-paper archive](https://cms.upsc.gov.in/exam-documents/question-papers/)")
+    else:
+        st.markdown("- [National Testing Agency (NTA)](https://www.nta.ac.in/)")
+        st.markdown("- [NTA downloads and examination resources](https://www.nta.ac.in/Downloads)")
+        st.markdown("- [Karnataka Examinations Authority (KEA)](https://cetonline.karnataka.gov.in/kea/)")
+        st.markdown("- [UPSC previous question papers](https://upsc.gov.in/examinations/previous-question-papers)")
 
-    if st.button("🚀 Generate Mock Test", key="quiz_btn"):
-        prompt = common_context(f"""
-Create exactly {number_of_questions} multiple-choice questions
-for the selected subject and topic.
+    st.warning("AI-generated practice questions are not official PYQs. Use the official portals above to verify original papers, years and answer keys.")
 
-Return ONLY valid JSON in this exact structure:
-{{
-  "questions": [
-    {{
-      "question": "Question text",
-      "options": [
-        "Option A",
-        "Option B",
-        "Option C",
-        "Option D"
-      ],
-      "answer": 0,
-      "explanation": "Explanation of the correct answer"
-    }}
-  ]
-}}
-
-Rules:
-- answer must be an integer from 0 to 3.
-- Include exactly four options per question.
-- Questions must be relevant to the selected topic.
-- Do not repeat questions.
-- Provide accurate answers and explanations.
+    st.markdown("#### 🧭 Topic-to-textbook study guide")
+    st.caption("Generate a study checklist for the selected topic. TECHNOVA will not invent textbook page numbers or claim an exact NCERT chapter unless it can verify it.")
+    if st.button("Create textbook study checklist", key="textbook_checklist", disabled=not ready):
+        prompt = common_context("""
+Create a concise textbook-alignment checklist for this topic.
+Include:
+1. Core concepts the student should locate in their prescribed textbook.
+2. Key terms, definitions, diagrams, tables or equations to review, only when relevant.
+3. 5 self-check questions for active recall.
+4. A short checklist for comparing notes with the textbook.
+Do NOT invent textbook page numbers, chapter numbers, quotations or exact NCERT section titles.
+If you are not certain of the exact textbook chapter title, say: 'Please confirm the chapter title in your current textbook edition.'
+Clearly distinguish general topic guidance from verified textbook references.
 """)
+        with st.spinner("Building your textbook study checklist..."):
+            answer, error = ask_ai(prompt, 2200)
+        if error:
+            show_error(error)
+        else:
+            st.session_state["textbook_checklist"] = answer
+            save_topic_history("Textbook study checklist")
 
-        with st.spinner("Preparing your mock examination..."):
-            answer, error = ask_ai(
-                prompt,
-                max_tokens=3500,
-                json_mode=True
-            )
+    if st.session_state.get("textbook_checklist"):
+        st.markdown(st.session_state["textbook_checklist"])
+        show_download(st.session_state["textbook_checklist"], "TECHNOVA_Textbook_Checklist.md")
 
+
+# ========================= INTERACTIVE MOCK TEST ============
+
+with tab_quiz:
+    st.subheader("🎯 Interactive mock test")
+    st.write("Generate MCQs, select answers, submit and receive your score.")
+    quiz_difficulty = st.selectbox("Difficulty", ["Easy", "Medium", "Hard"], key="quiz_difficulty")
+    quiz_count = st.selectbox("Number of questions", [5, 10, 15], key="quiz_count")
+    if st.button("⚡ Generate mock test", key="quiz_generate", disabled=not ready):
+        prompt = common_context(f"""
+Return ONLY valid JSON in this exact structure:
+{{"questions":[{{"question":"question text","options":{{"A":"option A","B":"option B","C":"option C","D":"option D"}},"answer":"A","explanation":"short explanation"}}]}}
+Create exactly {quiz_count} multiple-choice questions at {quiz_difficulty} difficulty.
+All questions must be from the selected subject and topic. Each answer must be exactly A, B, C or D. Make sure the correct answer is actually correct and the options are unambiguous.
+""")
+        with st.spinner("Creating your interactive test..."):
+            answer, error = ask_ai(prompt, 3800, json_mode=True)
         if error:
             show_error(error)
         else:
             try:
-                quiz_data = parse_json(answer)
-                questions = quiz_data.get("questions", [])
-
-                if not questions:
-                    raise ValueError("No questions generated.")
-
-                valid_questions = []
-
+                quiz = parse_json(answer)
+                questions = quiz.get("questions", [])
+                valid = []
                 for q in questions:
-                    options = q.get("options", [])
-                    correct = q.get("answer")
-
-                    if (
-                        isinstance(q.get("question"), str)
-                        and isinstance(options, list)
-                        and len(options) == 4
-                        and isinstance(correct, int)
-                        and 0 <= correct < 4
-                    ):
-                        valid_questions.append(q)
-
-                if not valid_questions:
-                    raise ValueError("Questions were not in the expected format.")
-
-                st.session_state.mock_test = valid_questions
-                st.session_state.mock_submitted = False
-                st.session_state.mock_answers = {}
-
-            except Exception as exc:
-                show_error(
-                    f"Could not prepare the mock test: {str(exc)}. Please try again."
-                )
-
-    questions = st.session_state.get("mock_test", [])
-
-    if questions:
-        st.divider()
-        st.subheader(f"📋 {subject}: {topic}")
-
-        if not st.session_state.get("mock_submitted", False):
-
-            with st.form("mock_test_form"):
-                answers = {}
-
-                for i, q in enumerate(questions):
-                    st.markdown(f"### Question {i + 1}")
-                    st.write(q["question"])
-
-                    selected = st.radio(
-                        "Choose your answer:",
-                        q["options"],
-                        index=None,
-                        key=f"mock_answer_{i}"
-                    )
-
-                    answers[i] = selected
-                    st.divider()
-
-                submitted = st.form_submit_button(
-                    "Submit My Answers"
-                )
-
-            if submitted:
-                st.session_state.mock_answers = answers
-                st.session_state.mock_submitted = True
-                st.rerun()
-
-        else:
-            answers = st.session_state.mock_answers
-            score = 0
-
-            for i, q in enumerate(questions):
-                correct_index = q["answer"]
-                correct_option = q["options"][correct_index]
-                selected = answers.get(i)
-
-                if selected == correct_option:
-                    score += 1
-
-            percentage = (score / len(questions)) * 100
-
-            st.success("🎉 Your test has been evaluated!")
-
-            col1, col2, col3 = st.columns(3)
-
-            col1.metric("Your Score", f"{score}/{len(questions)}")
-            col2.metric("Percentage", f"{percentage:.1f}%")
-
-            if percentage >= 80:
-                result = "Excellent! 🌟"
-            elif percentage >= 60:
-                result = "Good job! 👏"
-            elif percentage >= 40:
-                result = "Keep practising! 💪"
-            else:
-                result = "Don't give up. Keep learning! ❤️"
-
-            col3.metric("Performance", result)
-
-            st.progress(int(percentage))
-
-            st.subheader("📖 Answer Review")
-
-            for i, q in enumerate(questions):
-                correct_index = q["answer"]
-                correct_option = q["options"][correct_index]
-                selected = answers.get(i)
-
-                st.markdown(f"**Q{i + 1}. {q['question']}**")
-
-                if selected == correct_option:
-                    st.success(f"Correct: {correct_option}")
+                    opts = q.get("options", {})
+                    correct = str(q.get("answer", "")).upper()
+                    if q.get("question") and all(k in opts for k in ["A", "B", "C", "D"]) and correct in ["A", "B", "C", "D"]:
+                        valid.append(q)
+                if not valid:
+                    st.error("The AI did not return valid questions. Please generate the test again.")
                 else:
-                    st.error(
-                        f"Your answer: {selected if selected else 'Not answered'}"
-                    )
-                    st.info(f"Correct answer: {correct_option}")
+                    st.session_state["quiz_questions"] = valid
+                    save_topic_history("Mock test")
+                    st.session_state["quiz_submitted"] = False
+                    st.session_state["quiz_answers"] = {}
+            except Exception:
+                st.error("The mock test response could not be read. Please generate it again.")
 
-                st.write(
-                    "Explanation: " + q.get(
-                        "explanation",
-                        "No explanation provided."
-                    )
+    questions = st.session_state.get("quiz_questions", [])
+    if questions:
+        st.markdown(f"**Your test:** {len(questions)} questions · {quiz_difficulty} level")
+        with st.form("mock_test_form"):
+            answers = {}
+            for idx, q in enumerate(questions):
+                st.markdown(f"#### Q{idx+1}. {q['question']}")
+                labels = [f"{key}) {q['options'][key]}" for key in ["A", "B", "C", "D"]]
+                choice = st.radio(
+                    "Choose one answer",
+                    labels,
+                    index=None,
+                    key=f"answer_{idx}",
+                    label_visibility="collapsed"
                 )
+                answers[str(idx)] = choice[0] if choice else None
+                st.markdown("---")
+            submitted = st.form_submit_button("✅ Submit test and calculate score")
+        if submitted:
+            score = 0
+            for idx, q in enumerate(questions):
+                if answers.get(str(idx)) == str(q["answer"]).upper():
+                    score += 1
+            st.session_state["quiz_answers"] = answers
+            st.session_state["quiz_score"] = score
+            st.session_state["quiz_submitted"] = True
 
-                st.divider()
+        if st.session_state.get("quiz_submitted"):
+            score = st.session_state["quiz_score"]
+            total = len(questions)
+            percentage = round((score / total) * 100)
+            st.success(f"Your score: {score}/{total} ({percentage}%)")
+            st.progress(percentage)
+            if percentage >= 80:
+                st.balloons()
+                st.markdown('<div class="success-card">Excellent work! Keep revising to maintain your score.</div>', unsafe_allow_html=True)
+            elif percentage >= 50:
+                st.info("Good effort! Review the explanations and practise once more.")
+            else:
+                st.warning("Keep going. Read the explanations and try another practice test.")
+            st.markdown("### Answer review")
+            for idx, q in enumerate(questions):
+                chosen = st.session_state["quiz_answers"].get(str(idx))
+                correct = str(q["answer"]).upper()
+                if chosen == correct:
+                    st.markdown(f"🟢 **Q{idx+1}: Correct** — {correct}) {q['options'][correct]}")
+                else:
+                    chosen_text = f"{chosen}) {q['options'][chosen]}" if chosen else "Not answered"
+                    st.markdown(f"🔴 **Q{idx+1}: Incorrect** — Your answer: {chosen_text}. Correct: {correct}) {q['options'][correct]}")
+                if q.get("explanation"):
+                    st.caption(q["explanation"])
 
-            if st.button("🔄 Take Another Mock Test"):
-                st.session_state.mock_test = []
-                st.session_state.mock_submitted = False
-                st.session_state.mock_answers = {}
-                st.rerun()
+# ========================= DOUBT SOLVER =====================
 
-
-# =========================================================
-# TAB 7: DOUBT SOLVER
-# =========================================================
-
-with tabs[6]:
-    st.header("💬 Ask TECHNOVA AI")
-
-    st.write(
-        "Ask any question related to your selected subject."
-    )
-
+with tab_doubt:
+    st.subheader("💬 Ask TECHNOVA AI")
     doubt = st.text_area(
-        "Enter your doubt here:",
-        placeholder="Example: Explain this concept with an easy example...",
-        height=140,
-        key="doubt_input"
+        "Type your question",
+        placeholder="Ask for an explanation, a worked example, a labelled diagram description or help with a difficult concept...",
+        height=130
     )
-
-    if st.button("🤖 Solve My Doubt", key="doubt_btn"):
-
-        if not doubt.strip():
-            st.warning("Please enter your question first.")
-
+    if st.button("🧠 Explain my doubt", key="doubt_btn"):
+        if not ready:
+            st.warning("First select your subject and enter a topic in the sidebar.")
+        elif not doubt.strip():
+            st.warning("Please type your question.")
         else:
             prompt = common_context(f"""
-Answer this student's doubt:
-
+Answer this student's question:
 {doubt}
 
-Instructions:
-1. Explain in simple language.
-2. Break difficult concepts into steps.
-3. Give a relevant example.
-4. Include a diagram description if useful.
-5. Avoid unrelated information.
-6. If the question is outside the selected subject or topic,
-   politely explain that and ask the student to select the relevant topic.
+Explain step by step in {language}.
+Include one relevant example.
+If a diagram would help, provide a clear labelled text/ASCII diagram and explain its parts.
+Keep the answer tied to the selected subject and topic. If the question is outside the selected topic, politely say so and answer only if it is still within the selected subject.
 """)
-
-            with st.spinner("Thinking about your question..."):
-                answer, error = ask_ai(prompt, max_tokens=2500)
-
+            with st.spinner("Thinking through your question..."):
+                answer, error = ask_ai(prompt, 3000)
             if error:
                 show_error(error)
             else:
-                st.markdown(
-                    f'<div class="note-paper">{answer}</div>',
-                    unsafe_allow_html=True
-                )
+                st.markdown(answer)
+                save_topic_history("Doubt solving")
 
+# ========================= PREVIOUS TOPICS ==================
 
-# =========================================================
-# TAB 8: PREVIOUS TOPICS
-# =========================================================
-
-with tabs[7]:
-    st.header("📚 Your Previous Topics")
-
-    st.write(
-        "Your recently selected topics are listed here during this app session."
-    )
-
+with tab_history:
+    st.subheader("🕘 Your recently studied topics")
+    st.caption("Topics are kept in this browser session. They may reset when the app session restarts.")
     history = st.session_state.get("topic_history", [])
-
     if history:
-
-        for i, item in enumerate(history):
-
-            with st.expander(
-                f"📖 {item['subject']} — {item['topic']}"
-            ):
-                st.write(f"**Category:** {item['category']}")
+        for index, item in enumerate(history):
+            with st.expander(f"{item['topic']} · {item['subject']} · {item['activity']}"):
                 st.write(f"**Course:** {item['course']}")
-                st.write(
-                    f"**Specialisation:** {item['specialisation']}"
-                )
-                st.write(f"**Year / Level:** {item['level']}")
+                st.write(f"**Stream / specialisation:** {item['specialisation']}")
                 st.write(f"**Subject:** {item['subject']}")
                 st.write(f"**Topic:** {item['topic']}")
-
-                if i == 0:
-                    st.caption("Currently selected topic")
-
-        if st.button("🗑️ Clear Topic History"):
-            st.session_state.topic_history = []
+                st.write(f"**Last activity:** {item['activity']}")
+        if st.button("🗑️ Clear topic history", key="clear_history"):
+            st.session_state["topic_history"] = []
             st.rerun()
-
     else:
-        st.info("You haven't selected any topics yet.")
+        st.info("Your studied topics will appear here after you generate notes, diagrams, exam material or mock tests.")
 
-
-# =========================================================
-# FOOTER
-# =========================================================
+# ------------------------- FOOTER ----------------------------
 
 st.divider()
-
 st.markdown("""
-<div style="
-    text-align:center;
-    padding:20px;
-    border-radius:16px;
-    background:linear-gradient(100deg,#ede9fe,#fce7f3);
-    color:#4338ca;
-">
-    <h3>🚀 TECHNOVA AI</h3>
-    <p>Your Personal AI Learning Companion</p>
-    <p>❤️ Built with Love by Ruchita</p>
+<div style="text-align:center; padding:12px;">
+  <h3>🚀 TECHNOVA AI</h3>
+  <p>Your Personal AI Learning Companion</p>
+  <p style="color:#db2777; font-weight:700;">❤️ Built with Love by Ruchita</p>
+  <small style="color:#64748b;">Learn • Visualise • Practise • Succeed</small>
 </div>
 """, unsafe_allow_html=True)
