@@ -130,6 +130,109 @@ def ask_ai(prompt, max_tokens=3500, json_mode=False):
         return None, f"Gemini request failed: {message[:500]}"
 
 def parse_json(text):
+def normalise_mindmap(data, fallback_topic):
+    if isinstance(data, str):
+        data = parse_json(data)
+
+    if isinstance(data, list):
+        data = {"branches": data}
+
+    if not isinstance(data, dict):
+        raise ValueError("Mind map must be a JSON object.")
+
+    # Handle different AI response formats
+    for key in ["mindmap", "mind_map", "result", "data"]:
+        if isinstance(data.get(key), (dict, list)):
+            data = data[key]
+            break
+
+    center = (
+        data.get("center")
+        or data.get("main_topic")
+        or data.get("title")
+        or fallback_topic
+    )
+
+    branches = (
+        data.get("branches")
+        or data.get("main_branches")
+        or data.get("topics")
+        or data.get("nodes")
+        or data.get("children")
+    )
+
+    if isinstance(branches, dict):
+        branches = [
+            {"title": key, "points": value}
+            for key, value in branches.items()
+        ]
+
+    if not isinstance(branches, list):
+        raise ValueError("No readable mind-map branches found.")
+
+    cleaned = []
+
+    for branch in branches:
+        if isinstance(branch, str):
+            cleaned.append({
+                "title": branch,
+                "points": []
+            })
+
+        elif isinstance(branch, dict):
+            title = (
+                branch.get("title")
+                or branch.get("name")
+                or branch.get("label")
+                or branch.get("topic")
+                or "Concept"
+            )
+
+            points = (
+                branch.get("points")
+                or branch.get("subtopics")
+                or branch.get("children")
+                or branch.get("details")
+                or []
+            )
+
+            if isinstance(points, str):
+                points = [points]
+
+            if isinstance(points, list):
+                points = [
+                    str(p.get("title", p.get("name", p)))
+                    if isinstance(p, dict) else str(p)
+                    for p in points
+                ]
+            else:
+                points = []
+
+            cleaned.append({
+                "title": str(title),
+                "points": points[:4]
+            })
+
+    if not cleaned:
+        raise ValueError("Mind map contains no usable branches.")
+
+    return {
+        "center": str(center),
+        "branches": cleaned[:6]
+    }
+def common_context(task):
+try:
+    data = parse_json(answer)
+
+    st.session_state["mind_data"] = normalise_mindmap(
+        data,
+        topic
+    )
+
+    save_topic_history("Colourful mind map")
+
+except Exception as e:
+    st.error(f"Mind map generation failed: {str(e)}")
     """Parse model JSON even if it accidentally adds code fences."""
     if not text:
         raise ValueError("Empty JSON response")
