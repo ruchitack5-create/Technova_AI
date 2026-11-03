@@ -20,7 +20,7 @@ st.set_page_config(
 )
 
 MODEL = "gemini-3.5-flash-lite"
-bg_path = Path(__file__).parent / "file_00000000ae448208947b92ffb71da963.png"
+bg_path = Path(__file__).parent / "pngtree-3d-artificial-intelligence-background-picture-image_15418994.jpg"
 
 if bg_path.exists():
     with open(bg_path, "rb") as img:
