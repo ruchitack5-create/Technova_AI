@@ -4,6 +4,8 @@ import re
 import html
 import urllib.parse
 import urllib.request
+import base64
+from pathlib import Path
 from google import genai
 from google.genai import types
 
@@ -18,10 +20,14 @@ st.set_page_config(
 )
 
 MODEL = "gemini-3.5-flash-lite"
+bg_path = Path(__file__).parent / "technova_bg.png"
+
+with open(bg_path, "rb") as img:
+    bg_encoded = base64.b64encode(img.read()).decode()
 
 # ------------------------- DESIGN -------------------------
 
-st.markdown("""
+st.markdown(f"""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Poppins:wght@400;500;600;700&display=swap');
 
@@ -29,7 +35,17 @@ html, body, [class*="css"] {
     font-family: 'Poppins', sans-serif;
 }
 .stApp {
-    background: linear-gradient(135deg, #fff9f1 0%, #f4f6ff 55%, #fdf2f8 100%);
+    background:
+    linear-gradient(
+        rgba(5, 0, 20, 0.65),
+        rgba(5, 0, 20, 0.75)
+    ),
+    url("data:image/png;base64,BACKGROUND");
+    
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+}
 }
 h1, h2, h3 { color: #30245f; }
 .hero {
