@@ -27,8 +27,29 @@ with open(bg_path, "rb") as img:
 
 # ------------------------- DESIGN -------------------------
 
-st.markdown(f"""
+st.markdown("""
 <style>
+# Apply futuristic background
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image:
+        linear-gradient(
+            rgba(5, 0, 20, 0.65),
+            rgba(5, 0, 20, 0.75)
+        ),
+        url("data:image/png;base64,{bg_encoded}");
+
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+        background-repeat: no-repeat;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Poppins:wght@400;500;600;700&display=swap');
 
 html, body, [class*="css"] {
