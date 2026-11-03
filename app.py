@@ -894,4 +894,4 @@ st.markdown("""
   <p style="color:#db2777; font-weight:700;">❤️ Built with Love by Ruchita</p>
   <small style="color:#64748b;">Learn • Visualise • Practise • Succeed</small>
 </div>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)  
