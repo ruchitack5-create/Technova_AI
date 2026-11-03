@@ -20,12 +20,13 @@ st.set_page_config(
 )
 
 MODEL = "gemini-3.5-flash-lite"
-bg_path = Path(__file__).parent / "file_00000000ae448208947b92ffb71da963.png."
+bg_path = Path(__file__).parent / "file_00000000ae448208947b92ffb71da963.png"
 
 if bg_path.exists():
     with open(bg_path, "rb") as img:
         bg_encoded = base64.b64encode(img.read()).decode()
 else:
+    st.warning("Background image not found!")
     bg_encoded = ""
 # ------------------------- DESIGN -------------------------
 
