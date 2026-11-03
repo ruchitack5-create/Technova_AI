@@ -24,107 +24,135 @@ bg_path = Path(__file__).parent / "technova_bg.png"
 
 with open(bg_path, "rb") as img:
     bg_encoded = base64.b64encode(img.read()).decode()
-
 # ------------------------- DESIGN -------------------------
 
-st.markdown("""
+st.markdown(f"""
 <style>
-# Apply futuristic background
-st.markdown(
-    f"""
-    <style>
-    .stApp {{
-        background-image:
-        linear-gradient(
-            rgba(5, 0, 20, 0.65),
-            rgba(5, 0, 20, 0.75)
-        ),
-        url("data:image/png;base64,{bg_encoded}");
 
-        background-size: cover;
-        background-position: center;
-        background-attachment: fixed;
-        background-repeat: no-repeat;
-    }}
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 @import url('https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Poppins:wght@400;500;600;700&display=swap');
 
-html, body, [class*="css"] {
+html, body, [class*="css"] {{
     font-family: 'Poppins', sans-serif;
-}
-.stApp {
-    background:
+}}
+
+.stApp {{
+    background-image:
     linear-gradient(
         rgba(5, 0, 20, 0.65),
         rgba(5, 0, 20, 0.75)
     ),
-    url("data:image/png;base64,BACKGROUND");
-    
+    url("data:image/png;base64,{bg_encoded}");
+
     background-size: cover;
     background-position: center;
     background-attachment: fixed;
-}
-}
-h1, h2, h3 { color: #30245f; }
-.hero {
-    padding: 24px 26px;
+    background-repeat: no-repeat;
+}}
+
+[data-testid="stHeader"] {{
+    background: rgba(5, 0, 20, 0.35);
+}}
+
+[data-testid="stSidebar"] {{
+    background: rgba(12, 4, 30, 0.95);
+}}
+
+h1, h2, h3 {{
+    color: #e6ccff;
+}}
+
+.hero {{
+    padding: 28px;
     border-radius: 22px;
-    background: linear-gradient(110deg, #4338ca, #7c3aed, #db2777);
+    background: linear-gradient(
+        110deg,
+        rgba(20, 0, 45, 0.92),
+        rgba(75, 0, 130, 0.85),
+        rgba(130, 50, 220, 0.75)
+    );
     color: white;
-    margin-bottom: 18px;
-}
-.hero h1 { color: white; margin: 0; font-size: 2.25rem; }
-.hero p { color: #f5eaff; margin: 6px 0 0 0; }
-.note-paper {
-    background: repeating-linear-gradient(#fffef9 0px, #fffef9 31px, #dbeafe 32px);
-    border-left: 7px solid #f472b6;
+    margin-bottom: 20px;
+    border: 1px solid #b76aff;
+    box-shadow: 0 0 22px rgba(160, 70, 255, 0.5);
+    backdrop-filter: blur(12px);
+}}
+
+.hero h1 {{
+    color: white;
+    margin: 0;
+    font-size: 2.25rem;
+}}
+
+.hero p {{
+    color: #f0ddff;
+    margin: 6px 0 0 0;
+}}
+
+.note-paper {{
+    background: rgba(25, 12, 45, 0.92);
+    border-left: 7px solid #b76aff;
     border-radius: 14px;
     padding: 22px 24px;
-    color: #29234a;
-    box-shadow: 0 5px 18px rgba(60,40,100,.08);
-    font-family: 'Kalam', 'Comic Sans MS', cursive;
+    color: #f5eaff;
+    box-shadow: 0 5px 20px rgba(130, 50, 220, 0.2);
+    font-family: 'Kalam', cursive;
     line-height: 1.9;
-}
-.note-paper h1, .note-paper h2, .note-paper h3 {
-    font-family: 'Kalam', 'Comic Sans MS', cursive;
-    color: #6d28d9;
-}
-.tip {
-    background: #fff1b8;
+}}
+
+.note-paper h1,
+.note-paper h2,
+.note-paper h3 {{
+    font-family: 'Kalam', cursive;
+    color: #d8aaff;
+}}
+
+.tip {{
+    background: rgba(90, 55, 10, 0.85);
     border-left: 5px solid #eab308;
     border-radius: 10px;
     padding: 12px 15px;
     margin: 10px 0;
-    color: #513b00;
-}
-.definition {
-    background: #e0f2fe;
-    border-left: 5px solid #0284c7;
+    color: #fff0bd;
+}}
+
+.definition {{
+    background: rgba(25, 45, 85, 0.88);
+    border-left: 5px solid #60a5fa;
     border-radius: 10px;
     padding: 12px 15px;
     margin: 10px 0;
-    color: #123b55;
-}
-.success-card {
-    background: #dcfce7;
-    border-left: 5px solid #16a34a;
+    color: #dbeafe;
+}}
+
+.success-card {{
+    background: rgba(15, 65, 45, 0.88);
+    border-left: 5px solid #22c55e;
     border-radius: 10px;
     padding: 12px 15px;
-    color: #14532d;
-}
-.small-muted { color: #64748b; font-size: .9rem; }
-div.stButton > button {
+    color: #dcfce7;
+}}
+
+.small-muted {{
+    color: #c4b5fd;
+    font-size: .9rem;
+}}
+
+div.stButton > button {{
     border-radius: 12px;
-    border: 0;
+    border: 1px solid #b76aff;
     min-height: 44px;
-    background: linear-gradient(90deg, #4f46e5, #9333ea);
+    background: linear-gradient(90deg, #5100a8, #9333ea);
     color: white;
     font-weight: 600;
-}
-div.stButton > button:hover { color: white; border: 1px solid #312e81; }
+    box-shadow: 0 0 12px rgba(147, 51, 234, 0.4);
+}}
+
+div.stButton > button:hover {{
+    color: white;
+    border: 1px solid #e9d5ff;
+    box-shadow: 0 0 20px #9333ea;
+}}
+
 </style>
 """, unsafe_allow_html=True)
 
