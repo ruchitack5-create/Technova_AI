@@ -22,8 +22,11 @@ st.set_page_config(
 MODEL = "gemini-3.5-flash-lite"
 bg_path = Path(__file__).parent / "technova_bg.png"
 
-with open(bg_path, "rb") as img:
-    bg_encoded = base64.b64encode(img.read()).decode()
+if bg_path.exists():
+    with open(bg_path, "rb") as img:
+        bg_encoded = base64.b64encode(img.read()).decode()
+else:
+    bg_encoded = ""
 # ------------------------- DESIGN -------------------------
 
 st.markdown(f"""
