@@ -161,13 +161,32 @@ div.stButton > button:hover {{
 """, unsafe_allow_html=True)
 
 # ------------------------- API CLIENT -------------------------
-
 @st.cache_resource
 def get_client():
     api_key = st.secrets.get("GEMINI_API_KEY", "")
+
     if not api_key:
         return None
-    return genai.Client(api_key=api_key)
+
+    retry_options = types.HttpRetryOptions(
+        attempts=4,
+        initial_delay=2.0,
+        max_delay=8.0,
+        exp_base=2.0,
+        jitter=0.0,
+        http_status_codes=[503]
+    )
+
+    http_options = types.HttpOptions(
+        retry_options=retry_options
+    )
+
+    return genai.Client(
+        api_key=api_key,
+        http_options=http_options
+    )
+
+client = get_client()
 
 client = get_client()
 def ask_ai(prompt, max_tokens=3500, json_mode=False):
