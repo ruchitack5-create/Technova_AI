@@ -170,33 +170,72 @@ def get_client():
     return genai.Client(api_key=api_key)
 
 client = get_client()
-
 def ask_ai(prompt, max_tokens=3500, json_mode=False):
-    """Call Gemini and return text with friendly error handling."""
+
     if client is None:
-        return None, "Gemini API key is missing. Add GEMINI_API_KEY in Streamlit Cloud → App settings → Secrets."
+        return None, (
+            "Gemini API key is missing. "
+            "Please configure GEMINI_API_KEY in Streamlit Secrets."
+        )
+
     try:
+
         config = types.GenerateContentConfig(
             temperature=0.35,
             max_output_tokens=max_tokens,
-            response_mime_type="application/json" if json_mode else "text/plain"
+            response_mime_type=(
+                "application/json" if json_mode else "text/plain"
+            )
         )
+
         response = client.models.generate_content(
             model=MODEL,
             contents=prompt,
             config=config
         )
+
         answer = response.text or ""
+
         if not answer.strip():
-            return None, "The AI returned an empty response. Please try again."
+            return None, (
+                "The AI returned an empty response. "
+                "Please try again."
+            )
+
         return answer, None
+
     except Exception as exc:
+
+        error_code = getattr(exc, "code", None)
         message = str(exc)
-        if "429" in message or "RESOURCE_EXHAUSTED" in message:
-            return None, "Gemini API limit reached. Wait a little and try again."
-        if "404" in message or "NOT_FOUND" in message:
-            return None, f"Model '{MODEL}' was not found for this API key. Update MODEL in app.py to a model available in your Gemini account."
-        return None, f"Gemini request failed: {message[:500]}"
+
+        if error_code == 503 or "503" in message or "UNAVAILABLE" in message:
+
+            return None, (
+                "✨ TECHNOVA AI is experiencing high demand right now. "
+                "We tried processing your request several times, "
+                "but Gemini is temporarily unavailable. "
+                "Please wait a little and try again."
+            )
+
+        if error_code == 429 or "429" in message or "RESOURCE_EXHAUSTED" in message:
+
+            return None, (
+                "⚡ AI request limit reached. "
+                "Please wait before trying again."
+            )
+
+        if error_code == 404 or "404" in message or "NOT_FOUND" in message:
+
+            return None, (
+                f"Model '{MODEL}' is unavailable. "
+                "Please check your Gemini model configuration."
+            )
+
+        return None, (
+            "Something went wrong while generating your content. "
+            "Please try again later."
+        )
 
 def parse_json(text):
     """Parse model JSON even if it accidentally adds code fences."""
