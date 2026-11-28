@@ -1125,7 +1125,6 @@ st.markdown("""
 <div style="text-align:center; padding:12px;">
   <h3>🚀 TECHNOVA AI</h3>
   <p>Your Personal AI Learning Companion</p>
-  <p style="color:#db2777; font-weight:700;">❤️ Built with Love by Ruchita</p>
   <small style="color:#64748b;">Learn • Visualise • Practise • Succeed</small>
 </div>
 """, unsafe_allow_html=True) 
